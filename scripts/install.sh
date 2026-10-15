@@ -72,36 +72,23 @@ mkdir -p "$SUPPORT" "$HOME/Documents/Helferlein"
 "$SUPPORT/venv/bin/python3" -m pip install --quiet -r helper/requirements.txt
 cp helper/craftdocs.py "$SUPPORT/craftdocs.py"
 
-# --- 4. Apps finden (WordCraft, DeckCraft, GridCraft, Brave) -----------------
-say_step "Suche Word (WordCraft), PDF Acrobat (PDFCraft), PowerPoint (DeckCraft) und Brave"
-find_app() { # $1 = Suchmuster, $2 = Anzeigename, $3 = Standardname
-  local hit
-  hit="$(find /Applications "$HOME/Applications" -maxdepth 3 -iname "*$1*.app" -prune 2>/dev/null | head -n 1)"
-  if [ -n "$hit" ]; then
-    echo "  ✓ $2 → $hit" >&2
-    basename "$hit" .app
-  else
-    echo "  ⚠️  $2 nicht gefunden – es wird stattdessen die Standard-App benutzt." >&2
-    echo "$3"
-  fi
-}
-WORD_APP="$(find_app wordcraft "Word (WordCraft)" WordCraft)"
-PDF_APP="$(find_app pdfcraft "PDF Acrobat (PDFCraft)" PDFCraft)"
-[ "$PDF_APP" = "PDFCraft" ] && [ -n "$(find /Applications "$HOME/Applications" -maxdepth 3 -iname '*printcraft*.app' 2>/dev/null | head -n1)" ] \
-  && PDF_APP="$(basename "$(find /Applications "$HOME/Applications" -maxdepth 3 -iname '*printcraft*.app' | head -n1)" .app)"
-DECK_APP="$(find_app deckcraft "PowerPoint (DeckCraft)" DeckCraft)"
-GRID_APP="$(find_app gridcraft GridCraft GridCraft)"
-BRAVE_APP="$(find_app brave Brave "Brave Browser")"
+# --- 4. Programme finden (ArtCraft-Familie + Brave) ---------------------------
+say_step "Suche die ArtCraft-Programme und Brave"
+for pair in "WordCraft:Word" "GridCraft:Excel" "DeckCraft:PowerPoint" "PdfCraft:PDF Acrobat" "PhotoCraft:Photoshop" \
+            "LightCraft:Lightroom" "VectorCraft:Illustrator" "DesignCraft:InDesign" "FilmCraft:Premiere" \
+            "EffectCraft:After Effects" "SoundCraft:Pro Tools" "CADCraft:AutoCAD" "FigCraft:Figma" "Brave Browser:Internet"; do
+  app="${pair%%:*}"; label="${pair#*:}"
+  hit="$(find /Applications "$HOME/Applications" -maxdepth 3 -iname "${app// /*}*.app" -prune 2>/dev/null | head -n 1)"
+  [ -z "$hit" ] && [ "$app" = "PdfCraft" ] && hit="$(find /Applications "$HOME/Applications" -maxdepth 3 -iname "PrintCraft*.app" -prune 2>/dev/null | head -n 1)"
+  if [ -n "$hit" ]; then echo "  ✓ $label ($app)"; else echo "  · $label ($app) nicht installiert"; fi
+done
+echo "  Fehlende ArtCraft-Programme: https://github.com/storytold/craft-launcher"
 
-python_json() { "$SUPPORT/venv/bin/python3" -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
-cat > "$SUPPORT/config.json" <<JSON
+# Technische Einstellungen (App-Namen findet Helferlein selbst)
+if [ ! -f "$SUPPORT/config.json" ]; then
+  cat > "$SUPPORT/config.json" <<JSON
 {
-  "model": $(python_json "$MODEL"),
-  "wordApp": $(python_json "$WORD_APP"),
-  "pdfApp": $(python_json "$PDF_APP"),
-  "deckApp": $(python_json "$DECK_APP"),
-  "gridApp": $(python_json "$GRID_APP"),
-  "browserApp": $(python_json "$BRAVE_APP"),
+  "model": "$MODEL",
   "speechRate": 0,
   "silenceSeconds": 1.6,
   "voiceName": "",
@@ -109,6 +96,7 @@ cat > "$SUPPORT/config.json" <<JSON
   "maxReprompts": 1
 }
 JSON
+fi
 echo "  Einstellungen: $SUPPORT/config.json"
 
 # --- 4b. Schöne weibliche Stimme ---------------------------------------------
@@ -132,25 +120,17 @@ pkill -x Helferlein 2>/dev/null || true
 rm -rf "$APPDIR/Helferlein.app"
 cp -R build/Helferlein.app "$APPDIR/"
 
-# --- 6. Autostart beim Login (nur dieser Account) ----------------------------
-say_step "Richte Autostart ein"
-mkdir -p "$HOME/Library/LaunchAgents"
-cat > "$AGENT" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>$AGENT_ID</string>
-  <key>ProgramArguments</key>
-  <array><string>/usr/bin/open</string><string>-a</string><string>$APPDIR/Helferlein.app</string></array>
-  <key>RunAtLoad</key><true/>
-</dict>
-</plist>
-PLIST
+# --- 6. Starten (Autostart richtet Helferlein selbst ein) ----------------------
+say_step "Starte Helferlein"
+# Alter LaunchAgent aus früheren Versionen: Helferlein übernimmt den Autostart jetzt selbst
 launchctl bootout "gui/$(id -u)/$AGENT_ID" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" "$AGENT"
+rm -f "$AGENT"
+open "$APPDIR/Helferlein.app"
 
 echo
 echo "✅ Fertig. Helferlein startet jetzt und ab sofort bei jedem Login in diesem Account."
 echo "   Beim ersten Start: Vorname, wofür, Programme und Sprechstil einrichten."
 echo "   Beim ersten Start fragt macOS nach Mikrofon und Spracherkennung → beides erlauben."
+echo
+echo "   Word (WordCraft) auf Deutsch mit Rechtschreibprüfung:"
+echo "   ./extras/wordcraft-deutsch/install.sh   (oder in Helferlein: Zahnrad › Word auf Deutsch)"

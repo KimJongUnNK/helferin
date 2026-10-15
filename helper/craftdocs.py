@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Erzeugt .docx-, .pdf- und .pptx-Dateien für Helferlein.
+"""Erzeugt .docx-, .pdf-, .pptx- und .xlsx-Dateien für Helferlein.
 
 Liest ein JSON-Objekt von stdin und gibt den Pfad der erstellten Datei auf stdout aus.
 
   {"kind": "docx", "title": "...", "sections": [{"heading": "...", "text": "..."}], "out_dir": "..."}
   {"kind": "pdf",  "title": "...", "sections": [{"heading": "...", "text": "..."}], "out_dir": "..."}
   {"kind": "pptx", "title": "...", "slides": [{"title": "...", "bullets": ["..."]}], "out_dir": "..."}
+  {"kind": "xlsx", "title": "...", "columns": ["..."], "rows": [["..."]], "out_dir": "..."}
 """
 import datetime
 import html
@@ -15,8 +16,14 @@ import re
 import sys
 
 from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 from docx.shared import Pt
 from pptx import Presentation
+from pptx.enum.lang import MSO_LANGUAGE_ID
 from pptx.util import Inches, Pt as PptPt
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
@@ -24,6 +31,50 @@ from reportlab.lib.units import cm
 from reportlab.platypus import ListFlowable, ListItem, Paragraph, SimpleDocTemplate, Spacer
 
 BULLET_RE = re.compile(r"^\s*(?:[-•*–]|\d+[.)])\s+")
+
+
+DEFAULT_LANG = "de-DE"
+
+
+def lang_tag(payload: dict) -> str:
+    """Sprache der Texte als BCP-47-Tag (de-AT, de-DE, de-CH …); bestimmt die Rechtschreibprüfung in Word/WordCraft."""
+    tag = str(payload.get("lang") or DEFAULT_LANG).replace("_", "-")
+    return tag if re.match(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$", tag) else DEFAULT_LANG
+
+
+def set_docx_language(doc, tag: str) -> None:
+    """Setzt die Sprache in den Dokument-Standards und allen Absatz-/Zeichenformaten."""
+    def apply(rpr):
+        lang = rpr.find(qn("w:lang"))
+        if lang is None:
+            lang = OxmlElement("w:lang")
+            rpr.append(lang)
+        lang.set(qn("w:val"), tag)
+        lang.set(qn("w:eastAsia"), tag)
+    defaults = doc.styles.element.find(qn("w:docDefaults"))
+    if defaults is not None:
+        rpr_default = defaults.find(qn("w:rPrDefault"))
+        if rpr_default is None:
+            rpr_default = OxmlElement("w:rPrDefault")
+            defaults.insert(0, rpr_default)
+        rpr = rpr_default.find(qn("w:rPr"))
+        if rpr is None:
+            rpr = OxmlElement("w:rPr")
+            rpr_default.append(rpr)
+        apply(rpr)
+    for style in doc.styles:
+        if style.type in (1, 2):  # Absatz- und Zeichenformate
+            apply(style.element.get_or_add_rPr())
+
+
+PPTX_LANGS = {"de-AT": MSO_LANGUAGE_ID.GERMAN_AUSTRIA, "de-CH": MSO_LANGUAGE_ID.SWISS_GERMAN,
+              "de-LI": MSO_LANGUAGE_ID.GERMAN_LIECHTENSTEIN, "de-LU": MSO_LANGUAGE_ID.GERMAN_LUXEMBOURG}
+
+
+def pptx_language(tag: str):
+    if tag in PPTX_LANGS:
+        return PPTX_LANGS[tag]
+    return MSO_LANGUAGE_ID.GERMAN if tag.lower().startswith("de") else MSO_LANGUAGE_ID.NONE
 
 
 def safe_filename(title: str) -> str:
@@ -67,6 +118,7 @@ def build_docx(payload: dict) -> str:
     normal = doc.styles["Normal"]
     normal.font.name = "Calibri"
     normal.font.size = Pt(12)
+    set_docx_language(doc, lang_tag(payload))
 
     sections = payload.get("sections") or []
     # Briefe haben keine Überschriften – dann auch keinen großen Titel drüber
@@ -133,6 +185,7 @@ def build_pptx(payload: dict) -> str:
     prs = Presentation()
     prs.slide_width, prs.slide_height = Inches(13.333), Inches(7.5)  # 16:9
 
+    language = pptx_language(lang_tag(payload))
     cover = prs.slides.add_slide(prs.slide_layouts[0])
     cover.shapes.title.text = title
     cover.placeholders[1].text = datetime.date.today().strftime("%d.%m.%Y")
@@ -149,8 +202,72 @@ def build_pptx(payload: dict) -> str:
             p.text = b
             p.font.size = PptPt(24)
 
+    # Sprache an jedem Textstück, damit die Rechtschreibprüfung Deutsch nimmt
+    if language != MSO_LANGUAGE_ID.NONE:
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    for para in shape.text_frame.paragraphs:
+                        for run in para.runs:
+                            run.font.language_id = language
+
     path = unique_path(payload["out_dir"], safe_filename(title), "pptx")
     prs.save(path)
+    return path
+
+
+NUMBER_RE = re.compile(r"^-?(\d{1,3}(\.\d{3})+|\d+)(,\d+)?$|^-?\d+(\.\d+)?$")
+
+
+def to_cell(value):
+    """Zahlen (auch deutsch: 1.234,50 / 12,5 / 12,50 €) werden echte Zahlen, "=..." bleibt Formel."""
+    if not isinstance(value, str):
+        return value
+    v = value.strip()
+    if v.startswith("="):
+        return v
+    num = v.replace("€", "").replace("%", "").strip()
+    if num and NUMBER_RE.match(num):
+        if "," in num:
+            num = num.replace(".", "").replace(",", ".")
+        elif num.count(".") > 1 or re.match(r"^-?\d{1,3}(\.\d{3})+$", num):
+            num = num.replace(".", "")
+        try:
+            n = float(num)
+            n = int(n) if n.is_integer() and "." not in num else n
+            return n / 100 if v.endswith("%") else n
+        except ValueError:
+            pass
+    return v
+
+
+def build_xlsx(payload: dict) -> str:
+    title = (payload.get("title") or "Tabelle").strip()
+    columns = [str(c) for c in (payload.get("columns") or [])]
+    rows = payload.get("rows") or []
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = (re.sub(r"[\[\]:*?/\\]", " ", title)[:31].strip() or "Tabelle")
+    if columns:
+        ws.append(columns)
+        for cell in ws[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill("solid", fgColor="F2670A")
+            cell.alignment = Alignment(vertical="center")
+        ws.freeze_panes = "A2"
+    for row in rows:
+        ws.append([to_cell(v) for v in (row if isinstance(row, list) else [row])])
+
+    for i, col in enumerate(ws.iter_cols(), start=1):
+        width = max((len(str(c.value)) for c in col if c.value is not None), default=8)
+        ws.column_dimensions[get_column_letter(i)].width = min(max(width + 2, 8), 60)
+        for c in col:
+            if isinstance(c.value, float) and not c.number_format.endswith("%"):
+                c.number_format = "#,##0.00"
+
+    path = unique_path(payload["out_dir"], safe_filename(title), "xlsx")
+    wb.save(path)
     return path
 
 
@@ -166,6 +283,8 @@ def main() -> int:
             path = build_pdf(payload)
         elif kind == "pptx":
             path = build_pptx(payload)
+        elif kind == "xlsx":
+            path = build_xlsx(payload)
         else:
             raise ValueError(f"Unbekannter Typ: {kind!r}")
     except Exception as e:  # Fehler gehen als Text an die App zurück

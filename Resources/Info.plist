@@ -24,6 +24,8 @@
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>Helferlein hört dir zu, wenn du mit ihm sprichst.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Helferlein öffnet Dateien in Programmen wie PowerPoint über deren „Öffnen“-Dialog.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>Helferlein wandelt deine Sprache in Text um – direkt auf diesem Mac.</string>
 </dict>

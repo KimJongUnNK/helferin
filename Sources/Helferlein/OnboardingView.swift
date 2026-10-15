@@ -10,7 +10,8 @@ struct OnboardingView: View {
     @State private var firstName = ""
     @State private var purposes: Set<String> = []
     @State private var purposeNote = ""
-    @State private var tools: Set<Tool> = Set(Tool.allCases)
+    @State private var tools: Set<Tool> = []
+    @State private var installedTools: Set<Tool> = []
     @State private var style: Style = .casual
     @FocusState private var nameFocused: Bool
 
@@ -96,7 +97,11 @@ struct OnboardingView: View {
     }
 
     private func loadExisting() {
-        guard let p = assistant.profile else { return }
+        installedTools = assistant.actions.installedTools()
+        guard let p = assistant.profile else {
+            tools = Tool.defaultSelection(installed: installedTools)
+            return
+        }
         firstName = p.firstName
         purposes = Set(p.purposes)
         purposeNote = p.purposeNote
@@ -126,7 +131,7 @@ struct OnboardingView: View {
                 .padding(.top, 30)
             Text("Hallo! Ich bin Helferlein.")
                 .font(.system(size: 26, weight: .bold, design: .rounded))
-            Text("Ich helfe dir am Computer – mit Briefen, PDFs, Präsentationen und Fragen ans Internet. Du kannst mit mir reden oder schreiben.\n\nLass uns kurz einrichten, das dauert nur eine Minute.")
+            Text("Ich helfe dir am Computer – mit Briefen, Tabellen, PDFs, Präsentationen, deinen Kreativ-Programmen und Fragen ans Internet. Du kannst mit mir reden oder schreiben.\n\nLass uns kurz einrichten, das dauert nur eine Minute.")
                 .font(.system(size: 15))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -163,35 +168,55 @@ struct OnboardingView: View {
     private var toolsStep: some View {
         VStack(alignment: .leading, spacing: 12) {
             StepTitle(title: "Welche Programme soll ich benutzen?",
-                      subtitle: "Was du abwählst, fasse ich nicht an. Du kannst es später beim Zahnrad ändern.")
-            ForEach(Tool.allCases) { tool in
-                let on = tools.contains(tool)
-                Button {
-                    if on { tools.remove(tool) } else { tools.insert(tool) }
-                } label: {
-                    HStack(spacing: 14) {
-                        Image(systemName: tool.symbol)
-                            .font(.system(size: 20))
-                            .foregroundStyle(on ? Color.white : Color.accentColor)
-                            .frame(width: 42, height: 42)
-                            .background(on ? Color.accentColor : Color.accentColor.opacity(0.12),
-                                        in: RoundedRectangle(cornerRadius: 11))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(tool.label).font(.system(size: 16, weight: .semibold))
-                            Text(tool.detail).font(.system(size: 12)).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Image(systemName: on ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 22))
-                            .foregroundStyle(on ? Color.accentColor : Color.secondary.opacity(0.5))
-                    }
-                    .padding(12)
-                    .background(Color.secondary.opacity(on ? 0.1 : 0.05), in: RoundedRectangle(cornerRadius: 14))
-                    .contentShape(RoundedRectangle(cornerRadius: 14))
+                      subtitle: "Was du abwählst, fasse ich nicht an. Ändern geht später beim Zahnrad.")
+            ForEach(Tool.Group.allCases) { group in
+                Text(group.rawValue.uppercased())
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+                ForEach(Tool.allCases.filter { $0.group == group }) { tool in
+                    toolRow(tool)
                 }
-                .buttonStyle(.plain)
             }
         }
+    }
+
+    private func toolRow(_ tool: Tool) -> some View {
+        let on = tools.contains(tool)
+        let installed = installedTools.contains(tool)
+        return Button {
+            if on { tools.remove(tool) } else { tools.insert(tool) }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: tool.symbol)
+                    .font(.system(size: 17))
+                    .foregroundStyle(on ? Color.white : Color.accentColor)
+                    .frame(width: 36, height: 36)
+                    .background(on ? Color.accentColor : Color.accentColor.opacity(0.12),
+                                in: RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(tool.label).font(.system(size: 15, weight: .semibold))
+                        if !installed {
+                            Text("nicht installiert")
+                                .font(.system(size: 10, weight: .medium))
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(Color.secondary.opacity(0.15), in: Capsule())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Text(tool.detail).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(on ? Color.accentColor : Color.secondary.opacity(0.5))
+            }
+            .padding(10)
+            .background(Color.secondary.opacity(on ? 0.1 : 0.05), in: RoundedRectangle(cornerRadius: 12))
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
     }
 
     private var styleStep: some View {

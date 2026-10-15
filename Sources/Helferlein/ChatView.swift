@@ -1,18 +1,24 @@
 import SwiftUI
 
-/// Wurzel des Fensters: Einrichtung oder Chat.
+/// Wurzel des Fensters: Vorbereitung → Einrichtung → Chat (oder Einstellungen).
 struct RootView: View {
     @ObservedObject var assistant: Assistant
+    @ObservedObject var setup: SetupManager
 
     var body: some View {
         Group {
-            if assistant.needsOnboarding {
+            if !setup.isReady {
+                SetupView(setup: setup)
+            } else if assistant.needsOnboarding {
                 OnboardingView(assistant: assistant)
+            } else if assistant.showingSettings {
+                SettingsView(assistant: assistant)
             } else {
                 ChatView(assistant: assistant)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: assistant.needsOnboarding)
+        .animation(.easeInOut(duration: 0.2), value: assistant.showingSettings)
     }
 }
 
@@ -67,14 +73,14 @@ struct ChatView: View {
                     .animation(.none, value: status)
             }
             Spacer()
-            Button { assistant.editProfile() } label: {
+            Button { assistant.openSettings() } label: {
                 Image(systemName: "gearshape.fill")
                     .font(.system(size: 14))
                     .frame(width: 32, height: 32)
                     .background(Color.secondary.opacity(0.12), in: Circle())
             }
             .buttonStyle(.plain)
-            .help("Einstellungen: Name, Programme, Stil")
+            .help("Einstellungen: Profil, Mikrofon, Neustart …")
             Button {
                 assistant.mode == .voice ? assistant.switchToText() : assistant.switchToVoice()
             } label: {
@@ -134,7 +140,16 @@ struct ChatView: View {
                 RoundButton(symbol: "arrow.up", filled: true, help: "Senden (Enter)") { assistant.submitText() }
                     .disabled(assistant.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                               || assistant.phase == .thinking)
-                RoundButton(symbol: "mic.fill", filled: false, help: "Wieder sprechen") { assistant.switchToVoice() }
+                Button { assistant.switchToVoice() } label: {
+                    Label("Sprechen", systemImage: "mic.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .padding(.horizontal, 12)
+                        .frame(height: 36)
+                        .foregroundStyle(Color.accentColor)
+                        .background(Color.accentColor.opacity(0.14), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .help("Zurück zum Sprechen: Helferlein hört dir wieder zu")
             }
         }
     }
@@ -189,8 +204,14 @@ private struct QuickStart: View {
         if tools.contains(.pdf) {
             list.append(Item(symbol: Tool.pdf.symbol, title: "PDF erstellen", subtitle: "in PDF Acrobat", prompt: "Ich möchte ein PDF erstellen."))
         }
+        if tools.contains(.excel) {
+            list.append(Item(symbol: Tool.excel.symbol, title: "Tabelle erstellen", subtitle: "in Excel", prompt: "Ich möchte eine Tabelle erstellen."))
+        }
         if tools.contains(.powerpoint) {
             list.append(Item(symbol: Tool.powerpoint.symbol, title: "Präsentation", subtitle: "in PowerPoint", prompt: "Ich möchte eine Präsentation machen."))
+        }
+        if tools.contains(.word) {
+            list.append(Item(symbol: "text.badge.checkmark", title: "Rechtschreibung", subtitle: "Dokument korrigieren", prompt: "Korrigier bitte die Rechtschreibung in meinem letzten Dokument."))
         }
         if tools.contains(.internet) {
             list.append(Item(symbol: "magnifyingglass", title: "Im Internet suchen", subtitle: "mit Brave", prompt: "Ich möchte etwas im Internet suchen."))

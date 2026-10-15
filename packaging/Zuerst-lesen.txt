@@ -1,0 +1,28 @@
+HELFERLEIN – so geht's los
+==========================
+
+1. Ziehe „Helferlein“ auf „Programme“.
+
+2. Öffne Helferlein aus dem Programme-Ordner.
+   macOS sagt beim ersten Mal, dass die App „nicht überprüft“ werden kann
+   (sie ist kostenlos und nicht bei Apple registriert). Dann:
+   Systemeinstellungen › Datenschutz & Sicherheit › ganz unten „Dennoch öffnen“.
+
+3. Helferlein bereitet sich einmalig vor (lädt die KI, ca. 5 GB) und fragt dann
+   nach deinem Namen, deinen Programmen und wie er mit dir reden soll.
+
+4. Mikrofon und Spracherkennung erlauben, wenn macOS fragt.
+
+Tipps
+-----
+• Rechts oben in der Menüleiste ist Helferlein immer erreichbar.
+• Enter = leise stellen und tippen. „Sprechen“ = wieder reden.
+• Zahnrad = Einstellungen: Mikrofon wählen, alles neu starten, Word auf Deutsch.
+• Schönere Stimme: Systemeinstellungen › Bedienungshilfen › Gesprochene Inhalte ›
+  Systemstimme › Stimmen verwalten › Deutsch › „Anna (Premium)“.
+
+Word (WordCraft) auf Deutsch mit Rechtschreibprüfung:
+   Zahnrad › „Word auf Deutsch“ › Installieren
+   (oder im Terminal: ~/helferlein/extras/wordcraft-deutsch/install.sh)
+
+Hilfe & Quellcode: https://github.com/KimJongUnNK/helferin

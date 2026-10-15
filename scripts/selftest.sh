@@ -31,13 +31,18 @@ else
 import json, sys
 schema = {"type": "object", "properties": {
   "reply": {"type": "string"},
-  "action": {"type": "string", "enum": ["none", "create_document", "create_pdf", "create_presentation", "open_file", "open_website", "web_search", "close"]},
+  "action": {"type": "string", "enum": ["none", "create_document", "create_pdf", "create_presentation", "create_spreadsheet", "proofread_file", "open_app", "open_file", "open_website", "web_search", "close"]},
   "title": {"type": "string"}, "query": {"type": "string"}, "url": {"type": "string"},
+  "app": {"type": "string", "enum": ["word", "excel", "powerpoint", "pdf", "photoshop", "internet"]},
+  "columns": {"type": "array", "items": {"type": "string"}},
+  "rows": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}},
   "sections": {"type": "array", "items": {"type": "object", "properties": {"heading": {"type": "string"}, "text": {"type": "string"}}, "required": ["heading", "text"]}},
   "slides": {"type": "array", "items": {"type": "object", "properties": {"title": {"type": "string"}, "bullets": {"type": "array", "items": {"type": "string"}}}, "required": ["title", "bullets"]}}},
   "required": ["reply", "action"]}
 system = ("Du bist Helferlein. Aktionen: create_document (Brief/Liste in Word → sections), create_pdf (IMMER wenn das Wort PDF vorkommt), "
-          "create_presentation (PowerPoint, slides), "
+          "create_presentation (PowerPoint, slides), create_spreadsheet (Excel-Tabelle: columns, rows), "
+          "proofread_file (Rechtschreibung eines Word-Dokuments korrigieren), "
+          "open_app (Programm ohne Datei öffnen, app=word/excel/powerpoint/pdf/photoshop/internet; DeckCraft=powerpoint), "
           "open_file (query), web_search (query, Brave), open_website (url), close (keine Hilfe nötig), none.")
 print(json.dumps({"model": sys.argv[1], "stream": False, "format": schema, "options": {"temperature": 0.2},
                   "messages": [{"role": "system", "content": system}, {"role": "user", "content": sys.argv[2]}]}))
@@ -49,6 +54,9 @@ PY
   check "Schreib mir bitte eine Einkaufsliste für einen Apfelstrudel" create_document
   check "Mach mir eine kurze Präsentation über Vorarlberg" create_presentation
   check "Mach mir die Einladung zum Geburtstag bitte als PDF" create_pdf
+  check "Mach mir eine Tabelle für mein Haushaltsbuch mit Miete und Strom" create_spreadsheet
+  check "Öffne mir mein DeckCraft" open_app
+  check "Korrigier bitte die Rechtschreibung in meinem Brief" proofread_file
   check "Such mir im Internet das Wetter für Dornbirn morgen" web_search
   check "Nein danke, heute brauche ich nichts" close
 fi

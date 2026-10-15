@@ -6,7 +6,9 @@ import tempfile
 import unittest
 
 from docx import Document
+from openpyxl import load_workbook
 from pptx import Presentation
+from pptx.enum.lang import MSO_LANGUAGE_ID
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(HERE, "craftdocs.py")
@@ -38,6 +40,21 @@ class CraftDocsTest(unittest.TestCase):
         self.assertIn(("List Number", "Kochen"), texts)
         self.assertIn(("Normal", "Zweiter Absatz\nmit Umbruch."), texts)
 
+    def test_docx_language_is_german(self):
+        code, path, err = run({"kind": "docx", "title": "Sprache", "lang": "de-AT", "out_dir": self.tmp,
+                               "sections": [{"heading": "Hallo", "text": "Grüß Gott"}]})
+        self.assertEqual(code, 0, err)
+        import zipfile
+        with zipfile.ZipFile(path) as z:
+            styles = z.read("word/styles.xml").decode()
+        self.assertIn('w:val="de-AT"', styles)
+        self.assertNotIn('w:val="en-US"', styles)
+        code, path, err = run({"kind": "docx", "title": "Standard", "out_dir": self.tmp, "sections": []})
+        with zipfile.ZipFile(path) as z:
+            self.assertIn('w:val="de-DE"', z.read("word/styles.xml").decode())
+        code, path, err = run({"kind": "docx", "title": "Kaputt", "lang": "<x>", "out_dir": self.tmp, "sections": []})
+        self.assertEqual(code, 0, err)
+
     def test_letter_has_no_title_heading(self):
         code, path, err = run({
             "kind": "docx", "title": "Brief an Tante Gerti", "out_dir": self.tmp,
@@ -61,6 +78,9 @@ class CraftDocsTest(unittest.TestCase):
         self.assertEqual(code, 0, err)
         prs = Presentation(path)
         self.assertEqual(len(prs.slides), 3)
+        langs = {r.font.language_id for s in prs.slides for sh in s.shapes if sh.has_text_frame
+                 for p in sh.text_frame.paragraphs for r in p.runs}
+        self.assertEqual(langs, {MSO_LANGUAGE_ID.GERMAN})
         body = prs.slides[1].placeholders[1].text_frame
         self.assertEqual([p.text for p in body.paragraphs], ["März: Schnitt", "April: Säen"])
 
@@ -83,8 +103,32 @@ class CraftDocsTest(unittest.TestCase):
         code, _, err = run({"kind": "pdf", "title": "Leer", "out_dir": self.tmp, "sections": []})
         self.assertEqual(code, 0, err)
 
+    def test_xlsx_numbers_formulas_header(self):
+        code, path, err = run({
+            "kind": "xlsx", "title": "Haushaltsbuch: Oktober", "out_dir": self.tmp,
+            "columns": ["Posten", "Betrag", "Anteil"],
+            "rows": [["Miete", "750", "50%"], ["Strom", "1.234,50", ""], ["Kaffee", "12,5 €", ""],
+                     ["Summe", "=SUM(B2:B4)", ""]]})
+        self.assertEqual(code, 0, err)
+        self.assertTrue(path.endswith("Haushaltsbuch Oktober.xlsx"))
+        ws = load_workbook(path).active
+        self.assertEqual(ws.title, "Haushaltsbuch  Oktober")
+        self.assertEqual(ws["A1"].value, "Posten")
+        self.assertTrue(ws["A1"].font.bold)
+        self.assertEqual(ws["B2"].value, 750)
+        self.assertEqual(ws["C2"].value, 0.5)
+        self.assertEqual(ws["B3"].value, 1234.5)
+        self.assertEqual(ws["B4"].value, 12.5)
+        self.assertEqual(ws["B5"].value, "=SUM(B2:B4)")
+        self.assertEqual(ws.freeze_panes, "A2")
+
+    def test_xlsx_empty(self):
+        code, path, err = run({"kind": "xlsx", "title": "", "out_dir": self.tmp})
+        self.assertEqual(code, 0, err)
+        self.assertTrue(path.endswith("Tabelle.xlsx"))
+
     def test_bad_input_returns_error(self):
-        code, _, err = run({"kind": "xlsx", "out_dir": self.tmp})
+        code, _, err = run({"kind": "odt", "out_dir": self.tmp})
         self.assertEqual(code, 1)
         self.assertIn("Unbekannter Typ", err)
         code, _, err = run({"kind": "docx"})

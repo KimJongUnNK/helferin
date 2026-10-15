@@ -1,0 +1,167 @@
+name: Build
+
+# Baut die Mac-App (DMG zum Herunterladen) und WordCraft mit Deutsch.
+# Bei einem Tag v* entsteht ein GitHub-Release mit beiden Downloads.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Helferlein.app
+    runs-on: macos-14
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dokument-Werkzeug testen
+        run: |
+          python3 -m venv /tmp/testenv
+          /tmp/testenv/bin/pip install -q -r helper/requirements.txt
+          cd helper && /tmp/testenv/bin/python -m unittest -v test_craftdocs
+
+      - name: Swift bauen (Warnungen zählen)
+        run: |
+          swift --version
+          swift build -c release 2>&1 | tee build.log
+          echo "### Swift-Build" >> "$GITHUB_STEP_SUMMARY"
+          echo "Warnungen: $(grep -c 'warning:' build.log || true)" >> "$GITHUB_STEP_SUMMARY"
+          grep 'warning:' build.log | sort -u | head -50 >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Eigenständiges Python holen
+        run: |
+          REL=$(gh api repos/astral-sh/python-build-standalone/releases/latest)
+          TAG=$(echo "$REL" | jq -r .tag_name)
+          ASSET=$(echo "$REL" | jq -r '.assets[].name' \
+            | grep -E '^cpython-3\.12\.[0-9]+\+[0-9]+-aarch64-apple-darwin-install_only_stripped\.tar\.gz$' | head -n1)
+          [ -n "$ASSET" ] || ASSET=$(echo "$REL" | jq -r '.assets[].name' \
+            | grep -E '^cpython-3\.12\.[0-9]+\+[0-9]+-aarch64-apple-darwin-install_only\.tar\.gz$' | head -n1)
+          echo "Python: $ASSET"
+          curl -fsSL -o py.tgz "https://github.com/astral-sh/python-build-standalone/releases/download/$TAG/$ASSET"
+          mkdir -p embed && tar -xzf py.tgz -C embed
+          embed/python/bin/python3 -m pip install -q --no-cache-dir -r helper/requirements.txt
+          # Verkleinern: Tests, IDLE, Tk und Pip-Caches brauchen wir nicht
+          rm -rf embed/python/lib/python3.12/{test,idlelib,tkinter,turtledemo,ensurepip} embed/python/lib/tcl* embed/python/lib/tk* embed/python/share
+          find embed/python -name "__pycache__" -type d -prune -exec rm -rf {} +
+          du -sh embed/python
+
+      - name: App bauen
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          [[ "$VERSION" == v* ]] || VERSION="0.0.0-dev"
+          HELFERLEIN_VERSION="$VERSION" EMBED_PYTHON="$PWD/embed/python" ./scripts/build-app.sh
+
+      - name: Selbsttest der fertigen App
+        run: |
+          APP=build/Helferlein.app
+          codesign --verify --deep --strict "$APP" && echo "Signatur ok"
+          P="$APP/Contents/Resources/python/bin/python3"
+          echo '{"kind":"docx","title":"CI Test","out_dir":"/tmp/ci","sections":[{"heading":"Hallo","text":"- eins\n- zwei"}]}' \
+            | "$P" -I "$APP/Contents/Resources/craftdocs.py"
+          echo '{"kind":"xlsx","title":"CI Tabelle","out_dir":"/tmp/ci","columns":["A","B"],"rows":[["x","1,5"]]}' \
+            | "$P" -I "$APP/Contents/Resources/craftdocs.py"
+          ls -la /tmp/ci
+
+      - name: DMG erstellen
+        run: |
+          mkdir -p dmg
+          cp -R build/Helferlein.app dmg/
+          ln -s /Applications dmg/Programme
+          cp packaging/Zuerst-lesen.txt "dmg/Zuerst lesen.txt"
+          hdiutil create -volname "Helferlein" -srcfolder dmg -ov -format UDZO Helferlein.dmg
+          ls -la Helferlein.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Helferlein-dmg
+          path: Helferlein.dmg
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --title "Helferlein $GITHUB_REF_NAME" --notes-file packaging/release-notes.md
+          gh release upload "$GITHUB_REF_NAME" Helferlein.dmg --clobber
+
+  wordcraft-deutsch:
+    name: WordCraft mit Deutsch
+    runs-on: macos-14
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: WordCraft-Quellcode holen (neueste Version)
+        run: |
+          TAG=$(gh api repos/storytold/wordcraft/releases/latest --jq .tag_name 2>/dev/null || true)
+          echo "WordCraft-Tag: ${TAG:-main}"
+          if [ -n "$TAG" ]; then
+            git clone -q --depth 1 --branch "$TAG" https://github.com/storytold/wordcraft wc
+          else
+            git clone -q --depth 1 https://github.com/storytold/wordcraft wc
+          fi
+          echo "WC_VERSION=${TAG:-main-$(git -C wc rev-parse --short HEAD)}" >> "$GITHUB_ENV"
+
+      - name: Deutsch-Patch anwenden
+        run: cd wc && git apply --3way ../extras/wordcraft-deutsch/wordcraft-deutsch.patch && git status --short
+
+      - name: Rust aktualisieren
+        run: rustup update stable && rustup default stable && rustc --version
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            wc/target
+          key: wordcraft-${{ env.WC_VERSION }}-${{ hashFiles('extras/wordcraft-deutsch/wordcraft-deutsch.patch') }}
+          restore-keys: wordcraft-
+
+      - name: Tests der Rechtschreibprüfung (inkl. Deutsch)
+        run: cd wc && cargo test -q -p wordcraft-proof
+
+      - name: Mit echtem österreichischem Wörterbuch prüfen
+        run: |
+          mkdir -p dicts
+          for f in de_AT_frami.aff de_AT_frami.dic; do
+            curl -fsSL -o "dicts/$f" "https://raw.githubusercontent.com/LibreOffice/dictionaries/master/de/$f"
+          done
+          cd wc && WORDCRAFT_DICTIONARIES="$PWD/../dicts" cargo test -q -p wordcraft-proof de::tests::real_dictionary_when_installed -- --nocapture
+
+      - name: WordCraft bauen
+        run: cd wc && cargo build --release -p wordcraft
+
+      - name: Paket schnüren
+        run: |
+          mkdir -p pkg
+          cp wc/target/release/wordcraft pkg/WordCraft
+          echo "$WC_VERSION" > pkg/VERSION
+          cp wc/LICENSE-MIT wc/LICENSE-APACHE pkg/
+          (cd pkg && zip -q -r ../WordCraft-Deutsch-macos-arm64.zip .)
+          ls -la WordCraft-Deutsch-macos-arm64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WordCraft-Deutsch
+          path: WordCraft-Deutsch-macos-arm64.zip
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          for i in 1 2 3 4 5 6; do gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && break; sleep 30; done
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --title "Helferlein $GITHUB_REF_NAME" --notes-file packaging/release-notes.md
+          gh release upload "$GITHUB_REF_NAME" WordCraft-Deutsch-macos-arm64.zip --clobber

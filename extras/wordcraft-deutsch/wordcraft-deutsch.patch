@@ -1,0 +1,494 @@
+diff --git a/crates/proof/Cargo.toml b/crates/proof/Cargo.toml
+index abee190..67f191b 100644
+--- a/crates/proof/Cargo.toml
++++ b/crates/proof/Cargo.toml
+@@ -11,6 +11,7 @@ workspace = true
+ [dependencies]
+ log = { workspace = true }
+ miniz_oxide = "0.8"
++spellbook = "0.4"
+ 
+ [dev-dependencies]
+ proptest = { workspace = true }
+diff --git a/crates/proof/src/de/mod.rs b/crates/proof/src/de/mod.rs
+new file mode 100644
+index 0000000..657d40a
+--- /dev/null
++++ b/crates/proof/src/de/mod.rs
+@@ -0,0 +1,273 @@
++//! German proofing.
++//!
++//! - **Spelling** against an installed Hunspell German dictionary (found by [`crate::hunspell`]:
++//!   `de_DE_frami`/`de_DE`, `de_AT_frami`/`de_AT` or `de_CH_frami`/`de_CH` from the OS, a package
++//!   manager or LibreOffice; not bundled — the igerman98 files are GPL-licensed). German builds
++//!   most words by compounding (`Haustürschlüssel`, `Geburtstagseinladung`), which WordCraft's own
++//!   [`crate::affix`] engine doesn't do, so this module checks with [`spellbook`], a complete
++//!   Hunspell implementation (compounds, `CHECKSHARPS`, `KEEPCASE`, `NEEDAFFIX`…). Without a
++//!   dictionary German text gets no spelling marks, as before.
++//! - **Suggestions** from the same dictionary (`Gebutstag` → `Geburtstag`, `schoen` → `schön`).
++//! - **Grammar**: none yet; German text gets spelling marks only.
++//!
++//! The run's region picks the dictionary first (`de-AT` → `de_AT`, `de-CH` → `de_CH`); any other
++//! installed German dictionary is the fallback, so `de-AT` text is checked even with only `de_DE`.
++
++use std::collections::HashMap;
++use std::sync::{Arc, RwLock};
++
++/// A loaded German dictionary.
++pub struct GermanDict {
++    dict: spellbook::Dictionary,
++}
++
++impl GermanDict {
++    /// Parse a Hunspell pair (already decoded to UTF-8).
++    pub fn from_hunspell(aff: &str, dic: &str) -> Result<Self, String> {
++        spellbook::Dictionary::new(aff, dic).map(|dict| GermanDict { dict }).map_err(|e| format!("German dictionary: {e}"))
++    }
++
++    pub fn check(&self, word: &str) -> bool {
++        self.dict.check(word)
++    }
++
++    pub fn suggest(&self, word: &str, max: usize) -> Vec<String> {
++        let mut out = Vec::new();
++        self.dict.suggest(word, &mut out);
++        out.truncate(max);
++        out
++    }
++}
++
++/// Dictionaries loaded so far, by region (`None` cached when none is installed).
++static DICTS: RwLock<Option<HashMap<Region, Option<Arc<GermanDict>>>>> = RwLock::new(None);
++
++/// German regions with their own Hunspell dictionary.
++#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
++pub enum Region {
++    De,
++    At,
++    Ch,
++}
++
++impl Region {
++    /// The region of a BCP 47 tag (`de-AT`, `de_CH`, `de`): Germany when it names none.
++    pub fn from_tag(tag: Option<&str>) -> Region {
++        let region = tag.and_then(|t| t.split(['-', '_']).nth(1)).unwrap_or("");
++        if region.eq_ignore_ascii_case("at") {
++            Region::At
++        } else if region.eq_ignore_ascii_case("ch") || region.eq_ignore_ascii_case("li") {
++            Region::Ch
++        } else {
++            Region::De
++        }
++    }
++
++    /// Hunspell file names to try, this region first, then the other German ones.
++    fn names(self) -> &'static [&'static str] {
++        match self {
++            Region::De => &["de_DE_frami", "de_DE", "de", "de_AT_frami", "de_AT", "de_CH_frami", "de_CH"],
++            Region::At => &["de_AT_frami", "de_AT", "de_DE_frami", "de_DE", "de", "de_CH_frami", "de_CH"],
++            Region::Ch => &["de_CH_frami", "de_CH", "de_DE_frami", "de_DE", "de", "de_AT_frami", "de_AT"],
++        }
++    }
++}
++
++/// The German dictionary for `region` (loaded on first use), or `None` when none is installed.
++pub fn dictionary(region: Region) -> Option<Arc<GermanDict>> {
++    if let Some(map) = DICTS.read().unwrap_or_else(|e| e.into_inner()).as_ref()
++        && let Some(d) = map.get(&region)
++    {
++        return d.clone();
++    }
++    let loaded = load_installed(region).map(Arc::new);
++    let mut slot = DICTS.write().unwrap_or_else(|e| e.into_inner());
++    slot.get_or_insert_with(HashMap::new).entry(region).or_insert(loaded).clone()
++}
++
++fn load_installed(region: Region) -> Option<GermanDict> {
++    let Some((aff, dic)) = crate::hunspell::find(region.names()) else {
++        log::info!("German spelling: no Hunspell de_DE/de_AT/de_CH dictionary installed");
++        return None;
++    };
++    let read = |p: &std::path::Path| std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()));
++    let loaded = read(&aff)
++        .and_then(|a| read(&dic).map(|d| (a, d)))
++        .and_then(|(a, d)| crate::hunspell::decode(&a, &d))
++        .and_then(|(a, d)| GermanDict::from_hunspell(&a, &d));
++    match loaded {
++        Ok(d) => {
++            log::info!("German spelling: {}", dic.display());
++            Some(d)
++        }
++        Err(e) => {
++            log::warn!("German spelling: {e}");
++            None
++        }
++    }
++}
++
++/// Use this dictionary for every German region from now on (Hunspell text decoded to UTF-8).
++pub fn install_dictionary(aff: &str, dic: &str) -> Result<(), String> {
++    let d = Arc::new(GermanDict::from_hunspell(aff, dic)?);
++    let mut map = HashMap::new();
++    for r in [Region::De, Region::At, Region::Ch] {
++        map.insert(r, Some(d.clone()));
++    }
++    *DICTS.write().unwrap_or_else(|e| e.into_inner()) = Some(map);
++    Ok(())
++}
++
++/// Forget the loaded dictionaries, so the next check looks for installed ones again.
++pub fn reload_dictionary() {
++    *DICTS.write().unwrap_or_else(|e| e.into_inner()) = None;
++}
++
++/// The `.dic` file of the German dictionary found now (Germany's first); `None` when there is none.
++pub fn installed_path() -> Option<std::path::PathBuf> {
++    crate::hunspell::find(Region::De.names()).map(|(_, dic)| dic)
++}
++
++/// Is a German dictionary available (spelling is checked)?
++pub fn has_dictionary() -> bool {
++    dictionary(Region::De).is_some()
++}
++
++/// Is `word` spelled correctly in German (Germany's dictionary first)?
++pub fn is_correct(word: &str) -> bool {
++    is_correct_in(word, Region::De)
++}
++
++/// Is `word` spelled correctly in German as written in `region`? Numbers, single letters, short
++/// words in capitals (acronyms: `ORF`, `ÖBB`), words with digits and words in other scripts are
++/// accepted, and so is every word when no German dictionary is installed.
++pub fn is_correct_in(word: &str, region: Region) -> bool {
++    match dictionary(region) {
++        Some(d) => is_correct_with(&d, word),
++        None => true, // no German dictionary installed: no spelling marks
++    }
++}
++
++/// [`is_correct`] against a given dictionary.
++pub fn is_correct_with(d: &GermanDict, word: &str) -> bool {
++    let w = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '-');
++    let w = w.trim_matches('-');
++    let n = w.chars().count();
++    if n <= 1 || w.chars().any(|c| c.is_ascii_digit()) || !w.chars().any(char::is_alphabetic) {
++        return true;
++    }
++    if w.chars().all(|c| !c.is_lowercase()) && n <= 6 {
++        return true; // acronyms
++    }
++    if !w.chars().any(is_latin_letter) {
++        return true; // other scripts: no dictionary
++    }
++    if w.contains('-') {
++        // Bindestrich-Komposita (`E-Mail-Adresse`, `Vorarlberg-Reise`): the whole word, or every part
++        return known(d, w) || w.split('-').all(|p| p.chars().count() <= 1 || known(d, p));
++    }
++    known(d, w)
++}
++
++/// Is one word in the dictionary or the user dictionary?
++fn known(d: &GermanDict, w: &str) -> bool {
++    d.check(w) || crate::in_user_dictionary(&w.to_lowercase())
++}
++
++/// Suggestions for a misspelled German word (Germany's dictionary first), best first.
++pub fn suggest(word: &str, max: usize) -> Vec<String> {
++    dictionary(Region::De).map(|d| d.suggest(word, max)).unwrap_or_default()
++}
++
++/// Is `c` a letter of the Latin script (the only one the German dictionaries cover)?
++fn is_latin_letter(c: char) -> bool {
++    c.is_alphabetic() && (c < '\u{0250}' || ('\u{1E00}'..='\u{1EFF}').contains(&c))
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    /// A tiny German Hunspell dictionary written for these tests (the real ones are GPL and large):
++    /// plurals and verb endings by affixes, and compounding with Fugen-s like igerman98.
++    pub(crate) const AFF: &str = "SET UTF-8\nTRY esnrtiaodlucgmhbfwkzpvüäößjyxq\n\
++        COMPOUNDBEGIN x\nCOMPOUNDMIDDLE y\nCOMPOUNDEND z\nONLYINCOMPOUND c\nCOMPOUNDMIN 3\n\
++        SFX P Y 2\nSFX P 0 e .\nSFX P 0 en .\n\
++        SFX V Y 3\nSFX V 0 st .\nSFX V 0 t .\nSFX V 0 en .\n";
++    pub(crate) const DIC: &str = "15\nHaus/Px\nTür/P\ntür/Pyzc\nSchlüssel\nschlüssel/zc\nGeburtstag/P\nGeburtstags/xc\n\
++        Einladung/P\neinladung/Pzc\nStraße/P\ngeh/V\nschön/P\nJänner\nich\nund\n";
++
++    fn test_dict() -> GermanDict {
++        GermanDict::from_hunspell(AFF, DIC).expect("test dictionary")
++    }
++
++    #[test]
++    fn region_from_tag() {
++        assert_eq!(Region::from_tag(Some("de-AT")), Region::At);
++        assert_eq!(Region::from_tag(Some("de_CH")), Region::Ch);
++        assert_eq!(Region::from_tag(Some("de-LI")), Region::Ch);
++        assert_eq!(Region::from_tag(Some("de")), Region::De);
++        assert_eq!(Region::from_tag(None), Region::De);
++        assert_eq!(Region::At.names()[0], "de_AT_frami");
++    }
++
++    #[test]
++    fn words_compounds_and_affixes_are_correct() {
++        let d = test_dict();
++        for w in ["Haus", "Türen", "Haustür", "Haustürschlüssel", "Geburtstagseinladung", "gehst", "geht", "schöne", "Straße", "Jänner",
++                  "ORF", "2026", "a", "E-Haus"] {
++            assert!(is_correct_with(&d, w), "{w}");
++        }
++        // Compound-only forms aren't words on their own
++        assert!(!is_correct_with(&d, "tür") && !is_correct_with(&d, "Geburtstags"));
++    }
++
++    #[test]
++    fn misspellings_are_flagged_with_suggestions() {
++        let d = test_dict();
++        for w in ["Gebutstag", "Strase", "ihc", "Hausschlüsel", "schoen"] {
++            assert!(!is_correct_with(&d, w), "{w}");
++        }
++        assert!(d.suggest("Gebutstag", 5).contains(&"Geburtstag".to_string()), "{:?}", d.suggest("Gebutstag", 5));
++        assert!(d.suggest("ihc", 5).contains(&"ich".to_string()), "{:?}", d.suggest("ihc", 5));
++    }
++
++    #[test]
++    fn dictionary_files_are_found_by_region() {
++        let dir = std::env::temp_dir().join(format!("wc-de-{}", std::process::id()));
++        let _ = std::fs::create_dir_all(&dir);
++        std::fs::write(dir.join("de_AT_frami.aff"), AFF).expect("aff");
++        std::fs::write(dir.join("de_AT_frami.dic"), DIC).expect("dic");
++        let found = crate::hunspell::find_in(&dir, Region::De.names());
++        assert!(found.as_ref().is_some_and(|(_, d)| d.ends_with("de_AT_frami.dic")), "{found:?}: Austria is the fallback for Germany");
++        let _ = std::fs::remove_dir_all(&dir);
++    }
++
++    /// With a real igerman98 dictionary installed (CI sets `WORDCRAFT_DICTIONARIES`), German is
++    /// checked for real: compounds, Austrian words, suggestions. Skipped when none is installed.
++    #[test]
++    fn real_dictionary_when_installed() {
++        let Some((aff, dic)) = crate::hunspell::find(Region::At.names()) else {
++            return;
++        };
++        let (a, d) = crate::hunspell::decode(&std::fs::read(aff).unwrap(), &std::fs::read(dic).unwrap()).unwrap();
++        let d = GermanDict::from_hunspell(&a, &d).expect("the igerman98 dictionary loads");
++        for w in ["Haustürschlüssel", "Geburtstagseinladung", "Straße", "Jänner", "Kaffeehaus", "gehst", "schöne", "Bürgermeisterwahl"] {
++            assert!(is_correct_with(&d, w), "{w}");
++        }
++        for w in ["Gebutstag", "Strase", "schoen", "ihc"] {
++            assert!(!is_correct_with(&d, w), "{w}");
++        }
++        assert!(d.suggest("Gebutstag", 5).contains(&"Geburtstag".to_string()));
++        assert!(d.suggest("schoen", 5).contains(&"schön".to_string()));
++    }
++
++    #[test]
++    fn latin1_dictionaries_decode() {
++        let aff = b"SET ISO8859-1\n";
++        let dic = b"1\nStra\xdfe\n";
++        let (a, d) = crate::hunspell::decode(aff, dic).expect("ISO 8859-1 is supported");
++        assert!(a.starts_with("SET ISO8859-1"));
++        assert_eq!(d, "1\nStraße\n");
++    }
++}
+diff --git a/crates/proof/src/hunspell.rs b/crates/proof/src/hunspell.rs
+index d4b6f07..e1a0e91 100644
+--- a/crates/proof/src/hunspell.rs
++++ b/crates/proof/src/hunspell.rs
+@@ -163,6 +163,11 @@ pub fn decode(aff: &[u8], dic: &[u8]) -> Result<(String, String), String> {
+             Ok((text(aff, ".aff")?, text(dic, ".dic")?))
+         }
+         "ISO8859-2" | "ISO-8859-2" => Ok((decode_latin2(aff), decode_latin2(dic))),
++        // ISO 8859-1: every byte is the code point of the same number (German igerman98 dictionaries)
++        "ISO8859-1" | "ISO-8859-1" | "LATIN1" => {
++            let latin1 = |b: &[u8]| b.iter().map(|&c| char::from(c)).collect::<String>();
++            Ok((latin1(aff), latin1(dic)))
++        }
+         "KOI8-R" | "KOI8R" => Ok((decode_high(aff, KOI8_R_HIGH), decode_high(dic, KOI8_R_HIGH))),
+         "CP1251" | "WINDOWS-1251" | "MICROSOFT-CP1251" => Ok((decode_high(aff, CP1251_HIGH), decode_high(dic, CP1251_HIGH))),
+         other => Err(format!("unsupported encoding {other}")),
+diff --git a/crates/proof/src/lang.rs b/crates/proof/src/lang.rs
+index ded6f4c..813d60d 100644
+--- a/crates/proof/src/lang.rs
++++ b/crates/proof/src/lang.rs
+@@ -35,6 +35,10 @@ pub enum ProofLang {
+     /// Czech (`cs`, `cs-CZ`): the installed Hunspell dictionary, dictionary-driven suggestions
+     /// and generic punctuation checks. Hyphenation keeps the fallback English patterns.
+     Cs,
++    /// German (`de`, `de-DE`, `de-AT`, `de-CH`): the installed Hunspell dictionary (igerman98
++    /// `de_DE_frami` and friends, when there is one), checked with compounding by [`crate::de`].
++    /// No grammar rules yet; hyphenation keeps the fallback English patterns.
++    De,
+     /// A language without proofing tools here (`fr-FR`, `ja-JP`, `x-none`…). Like Word without
+     /// the language's proofing tools: no spelling or grammar marks, so its words are never
+     /// flagged as English misspellings. Hyphenation keeps using the English patterns, as before
+@@ -44,8 +48,8 @@ pub enum ProofLang {
+ 
+ impl ProofLang {
+     /// Every language with a spelling dictionary, in display order.
+-    pub const PROOFED: [ProofLang; 8] =
+-        [ProofLang::En, ProofLang::Pl, ProofLang::Pt, ProofLang::It, ProofLang::Hr, ProofLang::Tr, ProofLang::Ru, ProofLang::Cs];
++    pub const PROOFED: [ProofLang; 9] =
++        [ProofLang::En, ProofLang::Pl, ProofLang::Pt, ProofLang::It, ProofLang::Hr, ProofLang::Tr, ProofLang::Ru, ProofLang::Cs, ProofLang::De];
+ 
+     /// The proofing language of a BCP 47 tag (`pl-PL`, `en_GB`, `PL`…). Only the primary subtag
+     /// counts. No tag (or an empty one) is English, WordCraft's default editing language.
+@@ -70,6 +74,8 @@ impl ProofLang {
+             ProofLang::Ru
+         } else if primary.eq_ignore_ascii_case("cs") || primary.eq_ignore_ascii_case("ces") || primary.eq_ignore_ascii_case("cze") {
+             ProofLang::Cs
++        } else if primary.eq_ignore_ascii_case("de") || primary.eq_ignore_ascii_case("deu") || primary.eq_ignore_ascii_case("ger") || primary.eq_ignore_ascii_case("gsw") {
++            ProofLang::De
+         } else {
+             ProofLang::Other
+         }
+@@ -87,6 +93,7 @@ impl ProofLang {
+             ProofLang::Tr => "tr",
+             ProofLang::Ru => "ru",
+             ProofLang::Cs => "cs",
++            ProofLang::De => "de",
+             ProofLang::Other => "",
+         }
+     }
+@@ -170,6 +177,11 @@ mod tests {
+             assert_eq!(ProofLang::from_tag(Some(t)), ProofLang::Cs, "{t}");
+         }
+         assert_eq!(ProofLang::Cs.code(), "cs");
++        for t in ["de", "de-DE", "de_AT", "DE-ch", "deu", "gsw"] {
++            assert_eq!(ProofLang::from_tag(Some(t)), ProofLang::De, "{t}");
++        }
++        assert!(ProofLang::De.is_proofed());
++        assert_eq!(ProofLang::De.code(), "de");
+         assert!(ProofLang::Cs.is_proofed() && ProofLang::PROOFED.contains(&ProofLang::Cs));
+         for t in ["en", "en-US", "en-GB", "EN_au", "en-Latn-US"] {
+             assert_eq!(ProofLang::from_tag(Some(t)), ProofLang::En, "{t}");
+@@ -180,7 +192,7 @@ mod tests {
+         for t in ["tr", "tr-TR", "tr-CY", "TR_tr", "tur"] {
+             assert_eq!(ProofLang::from_tag(Some(t)), ProofLang::Tr, "{t}");
+         }
+-        for t in ["fr-FR", "de", "x-none", "ja-JP", "plx", "bgx", "trx", "csx", "e", "-"] {
++        for t in ["fr-FR", "nl", "x-none", "ja-JP", "plx", "bgx", "trx", "csx", "e", "-"] {
+             assert_eq!(ProofLang::from_tag(Some(t)), ProofLang::Other, "{t}");
+         }
+         assert_eq!(ProofLang::from_tag(None), ProofLang::En);
+diff --git a/crates/proof/src/lib.rs b/crates/proof/src/lib.rs
+index 114097d..077376f 100644
+--- a/crates/proof/src/lib.rs
++++ b/crates/proof/src/lib.rs
+@@ -42,6 +42,7 @@
+ pub mod affix;
+ pub mod bg;
+ pub mod cs;
++pub mod de;
+ pub mod dict;
+ pub mod hr;
+ pub mod hunspell;
+@@ -146,6 +147,7 @@ pub fn set_dictionaries_folder(dir: Option<std::path::PathBuf>) {
+     it::reload_dictionary();
+     hr::reload_dictionary();
+     tr::reload_dictionary();
++    de::reload_dictionary();
+     DICTIONARY_GENERATION.fetch_add(1, Ordering::Relaxed);
+ }
+ 
+@@ -157,6 +159,7 @@ pub fn installed_dictionaries() -> Vec<(ProofLang, Option<std::path::PathBuf>)>
+         (ProofLang::Pt, pt::installed_path()),
+         (ProofLang::It, it::installed_path()),
+         (ProofLang::Hr, hr::installed_path()),
++        (ProofLang::De, de::installed_path()),
+         (ProofLang::Tr, tr::installed_path()),
+     ]
+ }
+@@ -598,6 +601,7 @@ fn spelling_issue(text: &str, a: usize, b: usize, lang: ProofLang, opts: &Option
+         ProofLang::Tr => "Olası yazım hatası",
+         ProofLang::Ru => "Возможна орфографическая ошибка",
+         ProofLang::Cs => "Možná pravopisná chyba",
++        ProofLang::De => "Möglicher Rechtschreibfehler",
+         _ => "Possible spelling mistake",
+     };
+     Some(Issue { start: a, end: b, kind: IssueKind::Spelling, message: message.into(), suggestions: Vec::new(), lang })
+@@ -619,6 +623,7 @@ pub fn is_correct_in_with(word: &str, lang: ProofLang, opts: &Options) -> bool {
+         ProofLang::Tr => accepted_by_options(word, opts) || tr::is_correct(word),
+         ProofLang::Ru => accepted_by_options(word, opts) || ru::is_correct(word),
+         ProofLang::Cs => accepted_by_options(word, opts) || cs::is_correct(word),
++        ProofLang::De => accepted_by_options(word, opts) || de::is_correct(word),
+         ProofLang::Bg | ProofLang::Other => true,
+     }
+ }
+@@ -634,6 +639,7 @@ pub fn suggest_in(word: &str, max: usize, lang: ProofLang) -> Vec<String> {
+         ProofLang::Tr => tr::suggest(word, max),
+         ProofLang::Ru => ru::suggest(word, max),
+         ProofLang::Cs => cs::suggest(word, max),
++        ProofLang::De => de::suggest(word, max),
+         ProofLang::Bg | ProofLang::Other => Vec::new(),
+     }
+ }
+@@ -651,7 +657,7 @@ pub fn check_grammar_in(text: &str, lang: ProofLang) -> Vec<Issue> {
+         ProofLang::Tr => tr::grammar::check(text),
+         ProofLang::Ru => ru::grammar::check(text),
+         ProofLang::Cs => cs::grammar::check(text),
+-        ProofLang::Bg | ProofLang::Other => Vec::new(),
++        ProofLang::Bg | ProofLang::De | ProofLang::Other => Vec::new(),
+     }
+ }
+ 
+@@ -1177,7 +1183,7 @@ mod tests {
+         for l in [None, Some(""), Some("  "), Some("en"), Some("en-US"), Some("en-GB"), Some("EN-us"), Some("en_US")] {
+             assert!(has_dictionary(l), "{l:?}");
+         }
+-        for l in [Some("lt-LT"), Some("fr-FR"), Some("de"), Some("uk"), Some("es"), Some("-US"), Some("e")] {
++        for l in [Some("lt-LT"), Some("fr-FR"), Some("nl"), Some("uk"), Some("es"), Some("-US"), Some("e")] {
+             assert!(!has_dictionary(l), "{l:?}");
+         }
+         // The gate follows the dictionaries, not English: every proofed language is proofed.
+diff --git a/crates/ui-egui/src/i18n/mod.rs b/crates/ui-egui/src/i18n/mod.rs
+index 092e376..c0f9d00 100644
+--- a/crates/ui-egui/src/i18n/mod.rs
++++ b/crates/ui-egui/src/i18n/mod.rs
+@@ -129,8 +129,9 @@ pub static LANGUAGES: [LangInfo; 23] = [
+     },
+     LangInfo { code: "et", name: "Eesti", source: include_str!("et.tsv"), prefer_hans: false, editing_lang: None, catalog: OnceLock::new() },
+     // German, neutral across Germany, Austria and Switzerland; `de`, `de-DE`, `de-AT`, `de-CH` …
+-    // resolve here.
+-    LangInfo { code: "de", name: "Deutsch", source: include_str!("de.tsv"), prefer_hans: false, editing_lang: None, catalog: OnceLock::new() },
++    // resolve here. New documents are written in German: `wordcraft-proof` checks it
++    // (`ProofLang::De`) with an installed Hunspell de_DE/de_AT/de_CH dictionary.
++    LangInfo { code: "de", name: "Deutsch", source: include_str!("de.tsv"), prefer_hans: false, editing_lang: Some("de-DE"), catalog: OnceLock::new() },
+     // Russian; `ru`, `ru-RU`, `ru_RU.UTF-8` and other regions resolve here.
+     LangInfo { code: "ru", name: "Русский", source: include_str!("ru.tsv"), prefer_hans: false, editing_lang: None, catalog: OnceLock::new() },
+     LangInfo {
+diff --git a/crates/ui-egui/src/i18n/tests.rs b/crates/ui-egui/src/i18n/tests.rs
+index e23fa45..cc81473 100644
+--- a/crates/ui-egui/src/i18n/tests.rs
++++ b/crates/ui-egui/src/i18n/tests.rs
+@@ -1114,7 +1114,7 @@ fn an_italian_interface_writes_new_documents_in_italian() {
+ #[test]
+ fn the_editing_languages_are_the_ones_wordcraft_can_proof() {
+     let with: Vec<(&str, &str)> = Lang::all().filter_map(|l| l.editing_lang().map(|e| (l.code(), e))).collect();
+-    assert_eq!(with, [("pt-br", "pt-BR"), ("pl", "pl-PL"), ("cs", "cs-CZ"), ("tr", "tr-TR"), ("it", "it-IT")]);
++    assert_eq!(with, [("pt-br", "pt-BR"), ("pl", "pl-PL"), ("cs", "cs-CZ"), ("de", "de-DE"), ("tr", "tr-TR"), ("it", "it-IT")]);
+ }
+ 
+ #[test]
+diff --git a/crates/ui-egui/src/options.rs b/crates/ui-egui/src/options.rs
+index b39d0fd..50f85fc 100644
+--- a/crates/ui-egui/src/options.rs
++++ b/crates/ui-egui/src/options.rs
+@@ -345,6 +345,7 @@ fn language_name(lang: wordcraft_engine::proof::ProofLang) -> &'static str {
+         ProofLang::Tr => tl!("Turkish"),
+         ProofLang::Ru => tl!("Russian"),
+         ProofLang::Cs => tl!("Czech"),
++        ProofLang::De => tl!("German"),
+         // English uses its bundled word list; Bulgarian has no dictionary yet.
+         ProofLang::En | ProofLang::Bg | ProofLang::Other => "",
+     }
+diff --git a/crates/ui-egui/src/ribbon.rs b/crates/ui-egui/src/ribbon.rs
+index 0dd3889..ccdc1f5 100644
+--- a/crates/ui-egui/src/ribbon.rs
++++ b/crates/ui-egui/src/ribbon.rs
+@@ -550,6 +550,7 @@ pub(crate) fn language_name(tag: Option<&str>) -> String {
+             wordcraft_engine::proof::ProofLang::Tr => "Turkish".into(),
+             wordcraft_engine::proof::ProofLang::Ru => "Russian".into(),
+             wordcraft_engine::proof::ProofLang::Cs => "Czech".into(),
++            wordcraft_engine::proof::ProofLang::De => "German".into(),
+             wordcraft_engine::proof::ProofLang::En if tag.eq_ignore_ascii_case("en") => "English (United States)".into(),
+             _ => tag.to_string(),
+         },
