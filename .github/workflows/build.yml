@@ -16,10 +16,6 @@ defaults:
   run:
     shell: bash -eo pipefail {0}
 
-concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   app:
     name: Helferlein.app
