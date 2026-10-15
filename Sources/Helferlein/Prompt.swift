@@ -17,8 +17,8 @@ enum Prompt {
         }
         if p.has(.pdf) {
             abilities.append("""
-            - "create_pdf": dasselbe als PDF (öffnet sich in PDF Acrobat). Nimm das, wenn sie ausdrücklich ein PDF will \
-            oder etwas zum Ausdrucken/Verschicken, das nicht mehr bearbeitet wird. Gleiche Felder wie create_document.
+            - "create_pdf": dasselbe als PDF (öffnet sich in PDF Acrobat). Gleiche Felder wie create_document. \
+            WICHTIG: Sobald im Wunsch das Wort „PDF“ vorkommt, IMMER "create_pdf" – nie "create_document".
             """)
         }
         if p.has(.word) || p.has(.pdf) {

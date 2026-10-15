@@ -13,7 +13,12 @@ echo "1) Dokument-Werkzeug"
 (cd helper && "$PY" -m unittest -q test_craftdocs) && ok "Word/PDF/PowerPoint-Tests" || bad "Word/PDF/PowerPoint-Tests"
 
 echo "2) Swift-Build"
-swift build -c release >/dev/null 2>&1 && ok "kompiliert" || bad "Build fehlgeschlagen (swift build -c release für Details)"
+if BUILD_LOG="$(swift build -c release 2>&1)"; then
+  ok "kompiliert"
+else
+  bad "Build fehlgeschlagen – die ersten Fehler:"
+  echo "$BUILD_LOG" | grep -E "error:" | head -15 | sed 's/^/     /'
+fi
 
 echo "3) Ollama + Modell ($MODEL)"
 if ! curl -fs http://127.0.0.1:11434/api/tags >/dev/null; then
@@ -31,7 +36,7 @@ schema = {"type": "object", "properties": {
   "sections": {"type": "array", "items": {"type": "object", "properties": {"heading": {"type": "string"}, "text": {"type": "string"}}, "required": ["heading", "text"]}},
   "slides": {"type": "array", "items": {"type": "object", "properties": {"title": {"type": "string"}, "bullets": {"type": "array", "items": {"type": "string"}}}, "required": ["title", "bullets"]}}},
   "required": ["reply", "action"]}
-system = ("Du bist Helferlein. Aktionen: create_document (Brief/Liste in Word → sections), create_pdf (nur wenn ausdrücklich PDF), "
+system = ("Du bist Helferlein. Aktionen: create_document (Brief/Liste in Word → sections), create_pdf (IMMER wenn das Wort PDF vorkommt), "
           "create_presentation (PowerPoint, slides), "
           "open_file (query), web_search (query, Brave), open_website (url), close (keine Hilfe nötig), none.")
 print(json.dumps({"model": sys.argv[1], "stream": False, "format": schema, "options": {"temperature": 0.2},

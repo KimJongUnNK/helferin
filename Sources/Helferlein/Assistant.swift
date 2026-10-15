@@ -241,7 +241,11 @@ final class Assistant: ObservableObject {
         var note: ChatMessage?
         let actions = self.actions
         // Sicherheitsnetz: abgewählte Programme werden nie benutzt, auch wenn das Modell es versucht
-        let action = allowed.contains(reply.action) ? reply.action : .none
+        var action = allowed.contains(reply.action) ? reply.action : .none
+        // Sagt sie „PDF“, wird es ein PDF – egal, was das Modell gewählt hat
+        if action == .create_document, allowed.contains(.create_pdf), Self.mentionsPDF(lastUserText) {
+            action = .create_pdf
+        }
 
         do {
             switch action {
@@ -304,7 +308,10 @@ final class Assistant: ObservableObject {
             if mode == .voice {
                 say(spoken) { [weak self] in self?.onClose?() }
             } else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.onClose?() }
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    self?.onClose?()
+                }
             }
         } else {
             say(spoken)
@@ -312,6 +319,14 @@ final class Assistant: ObservableObject {
     }
 
     // MARK: Helfer
+
+    private var lastUserText: String {
+        history.last { $0.role == "user" }?.content ?? ""
+    }
+
+    static func mentionsPDF(_ text: String) -> Bool {
+        text.range(of: #"\bpdfs?\b"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
 
     private func add(_ role: ChatMessage.Role, _ text: String, symbol: String? = nil) {
         messages.append(ChatMessage(role: role, text: text, symbol: symbol))

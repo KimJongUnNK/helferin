@@ -83,7 +83,7 @@ struct OnboardingView: View {
         guard canContinue else { return }
         if step < lastStep {
             withAnimation { step += 1 }
-            if step == 1 { DispatchQueue.main.async { nameFocused = true } }
+            if step == 1 { Task { @MainActor in nameFocused = true } }
             return
         }
         assistant.stopPreview()

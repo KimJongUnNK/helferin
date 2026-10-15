@@ -52,7 +52,7 @@ struct ChatView: View {
         }
         .frame(width: 420, height: 600)
         .onChange(of: assistant.focusRequest) { _ in
-            DispatchQueue.main.async { inputFocused = true }
+            Task { @MainActor in inputFocused = true }
         }
     }
 
