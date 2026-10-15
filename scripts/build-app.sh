@@ -40,13 +40,17 @@ cp extras/wordcraft-deutsch/install.sh extras/wordcraft-deutsch/wordcraft-deutsc
 if [ -n "${EMBED_PYTHON:-}" ]; then
   [ -x "$EMBED_PYTHON/bin/python3" ] || { echo "EMBED_PYTHON: $EMBED_PYTHON/bin/python3 fehlt" >&2; exit 1; }
   ditto "$EMBED_PYTHON" "$RES/python"
+  # Bytecode jetzt (vor dem Signieren) erzeugen; zur Laufzeit läuft Python mit -B und schreibt nichts ins Paket
+  "$RES/python/bin/python3" -I -m compileall -q -j 0 "$RES/python/lib" >/dev/null || true
   # Jede ausführbare Datei / Bibliothek darin einzeln (ad hoc) signieren
   find "$RES/python" -type f \( -name "*.so" -o -name "*.dylib" -o -perm -u+x \) -print0 \
     | while IFS= read -r -d '' f; do
         if file "$f" | grep -q "Mach-O"; then codesign --force --sign - "$f" >/dev/null 2>&1 || true; fi
       done
-  "$RES/python/bin/python3" -I -c "import docx, pptx, reportlab, openpyxl; print('Python ok')"
+  "$RES/python/bin/python3" -I -B -c "import docx, pptx, reportlab, openpyxl; print('Python ok')"
 fi
 
+find "$APP" -name ".DS_Store" -delete
 codesign --force --sign - --identifier at.boenke.helferlein "$APP"
+codesign --verify --deep --strict "$APP"
 echo "✅ Gebaut: $APP"

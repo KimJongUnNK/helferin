@@ -70,10 +70,14 @@ jobs:
           codesign --verify --deep --strict "$APP" && echo "Signatur ok"
           P="$APP/Contents/Resources/python/bin/python3"
           echo '{"kind":"docx","title":"CI Test","out_dir":"/tmp/ci","sections":[{"heading":"Hallo","text":"- eins\n- zwei"}]}' \
-            | "$P" -I "$APP/Contents/Resources/craftdocs.py"
+            | "$P" -I -B "$APP/Contents/Resources/craftdocs.py"
           echo '{"kind":"xlsx","title":"CI Tabelle","out_dir":"/tmp/ci","columns":["A","B"],"rows":[["x","1,5"]]}' \
-            | "$P" -I "$APP/Contents/Resources/craftdocs.py"
+            | "$P" -I -B "$APP/Contents/Resources/craftdocs.py"
           ls -la /tmp/ci
+          # Die Signatur muss danach immer noch stimmen (sonst meldet macOS „beschädigt“)
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          CHANGED=$(find "$APP/Contents/Resources" -newer "$APP/Contents/_CodeSignature/CodeResources" -type f)
+          [ -z "$CHANGED" ] || { echo "Nach dem Signieren geändert:"; echo "$CHANGED" | head; exit 1; }
 
       - name: DMG erstellen
         run: |
@@ -83,6 +87,10 @@ jobs:
           cp packaging/Zuerst-lesen.txt "dmg/Zuerst lesen.txt"
           hdiutil create -volname "Helferlein" -srcfolder dmg -ov -format UDZO Helferlein.dmg
           ls -la Helferlein.dmg
+          # Gegenprobe wie beim Nutzer: DMG einhängen und die App darin prüfen
+          MNT=$(hdiutil attach -nobrowse -readonly Helferlein.dmg | tail -n1 | cut -f3)
+          codesign --verify --deep --strict --verbose=2 "$MNT/Helferlein.app"
+          hdiutil detach "$MNT"
 
       - name: Fehler als Annotation melden
         if: failure()

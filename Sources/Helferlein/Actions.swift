@@ -68,7 +68,12 @@ struct Actions: Sendable {
 
         let p = Process()
         p.executableURL = settings.pythonURL
-        p.arguments = ["-I", settings.helperURL.path]
+        // -B: nie .pyc ins App-Paket schreiben – das würde die Signatur zerstören („beschädigt“)
+        p.arguments = ["-I", "-B", settings.helperURL.path]
+        var env = ProcessInfo.processInfo.environment
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        env["LANG"] = "de_DE.UTF-8"
+        p.environment = env
         let input = Pipe(), output = Pipe(), errors = Pipe()
         p.standardInput = input
         p.standardOutput = output
@@ -90,7 +95,7 @@ struct Actions: Sendable {
     /// Prüft, ob das Dokument-Werkzeug startklar ist (Python + Bibliotheken).
     func helperWorks() -> Bool {
         guard FileManager.default.isExecutableFile(atPath: settings.pythonURL.path) else { return false }
-        return Self.run(settings.pythonURL.path, ["-I", "-c", "import docx, pptx, reportlab, openpyxl"]) == 0
+        return Self.run(settings.pythonURL.path, ["-I", "-B", "-c", "import docx, pptx, reportlab, openpyxl"]) == 0
     }
 
     // MARK: Programme
