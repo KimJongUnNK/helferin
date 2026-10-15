@@ -1,7 +1,7 @@
 name: Build
 
 # Baut die Mac-App (DMG zum Herunterladen) und WordCraft mit Deutsch.
-# Bei einem Tag v* entsteht ein GitHub-Release mit beiden Downloads.
+# Jeder Push auf main aktualisiert das Release v<packaging/VERSION> mit beiden Downloads.
 on:
   push:
     branches: [main]
@@ -60,8 +60,7 @@ jobs:
 
       - name: App bauen
         run: |
-          VERSION="${GITHUB_REF_NAME}"
-          [[ "$VERSION" == v* ]] || VERSION="0.0.0-dev"
+          VERSION="v$(cat packaging/VERSION)"
           set -o pipefail
           HELFERLEIN_VERSION="$VERSION" EMBED_PYTHON="$PWD/embed/python" bash -x ./scripts/build-app.sh 2>&1 | tee app.log
 
@@ -100,11 +99,12 @@ jobs:
           path: Helferlein.dmg
 
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.ref == 'refs/heads/main'
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
-            gh release create "$GITHUB_REF_NAME" --title "Helferlein $GITHUB_REF_NAME" --notes-file packaging/release-notes.md
-          gh release upload "$GITHUB_REF_NAME" Helferlein.dmg --clobber
+          TAG="v$(cat packaging/VERSION)"
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Helferlein $TAG" --notes-file packaging/release-notes.md
+          gh release upload "$TAG" Helferlein.dmg --clobber
 
   wordcraft-deutsch:
     name: WordCraft mit Deutsch
@@ -182,9 +182,10 @@ jobs:
           path: WordCraft-Deutsch-macos-arm64.zip
 
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.ref == 'refs/heads/main'
         run: |
-          for i in 1 2 3 4 5 6; do gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && break; sleep 30; done
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
-            gh release create "$GITHUB_REF_NAME" --title "Helferlein $GITHUB_REF_NAME" --notes-file packaging/release-notes.md
-          gh release upload "$GITHUB_REF_NAME" WordCraft-Deutsch-macos-arm64.zip --clobber
+          TAG="v$(cat packaging/VERSION)"
+          for i in 1 2 3 4 5 6; do gh release view "$TAG" >/dev/null 2>&1 && break; sleep 30; done
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Helferlein $TAG" --notes-file packaging/release-notes.md
+          gh release upload "$TAG" WordCraft-Deutsch-macos-arm64.zip --clobber
