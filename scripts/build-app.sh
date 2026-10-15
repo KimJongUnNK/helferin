@@ -34,7 +34,7 @@ iconutil -c icns "$ICONSET" -o "$RES/AppIcon.icns"
 # Dokument-Werkzeug und WordCraft-Deutsch-Paket mitliefern
 cp helper/craftdocs.py "$RES/craftdocs.py"
 mkdir -p "$RES/wordcraft-deutsch"
-cp extras/wordcraft-deutsch/install.sh extras/wordcraft-deutsch/wordcraft-deutsch.patch "$RES/wordcraft-deutsch/"
+cp extras/wordcraft-deutsch/install.sh extras/wordcraft-deutsch/wordcraft-deutsch.patch extras/wordcraft-deutsch/BASE_COMMIT "$RES/wordcraft-deutsch/"
 
 # Eigenständiges Python einbauen (Download-Version)
 if [ -n "${EMBED_PYTHON:-}" ]; then

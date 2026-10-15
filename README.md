@@ -1,120 +1,122 @@
 <p align="center"><img src="Resources/Logo/logo-256.png" width="160" alt="Helferlein-Logo: zwei papierweiße Hände auf orangem Grund"></p>
 
 <h1 align="center">Helferlein</h1>
-<p align="center"><b>Dein lokaler Sprach-Assistent für den Mac.</b><br>Er fragt beim Login, ob du Hilfe brauchst. Er schreibt Briefe, PDFs und Präsentationen und sucht im Internet. Alles läuft auf deinem Mac, nichts geht in eine Cloud.</p>
+<p align="center"><b>Dein lokaler Sprach-Assistent für den Mac.</b><br>Er fragt beim Login, ob du Hilfe brauchst, schreibt Briefe, Tabellen, PDFs und Präsentationen, öffnet deine Programme und sucht im Internet. Alles läuft auf deinem Mac, nichts geht in eine Cloud.</p>
 
 ---
 
+## Download (ohne Terminal)
+
+1. Unter **[Releases](../../releases/latest)** die Datei **Helferlein.dmg** laden.
+2. Öffnen und Helferlein auf **Programme** ziehen.
+3. Helferlein starten. Beim ersten Mal sagt macOS, dass die App „nicht überprüft“ werden kann. Dann: **Systemeinstellungen › Datenschutz & Sicherheit › „Dennoch öffnen“**.
+4. Helferlein bereitet sich einmalig selbst vor: Es lädt das KI-Programm Ollama und das Sprachmodell (ca. 5 GB) und findet deine Programme. Danach geht es ohne Internet.
+
+**Voraussetzungen:** Mac mit Apple-Chip (M1 oder neuer), macOS 13 oder neuer, 16 GB RAM empfohlen.
+
 ## So fühlt es sich an
 
-1. **Einloggen.** Rechts oben unter der Menüleiste geht ein Fenster auf, und Helferlein fragt per Stimme: *„Brauchst du heute Hilfe?“*
-2. **Antworten.** Du kannst einfach reden. Willst du lieber tippen, drück **Enter**: Er wird still, und du schreibst.
-3. **Er erledigt es.** Ein Brief öffnet sich in **Word**, ein PDF in **PDF Acrobat**, Folien in **PowerPoint**. Eine Suche öffnet sich im **Brave Browser**.
-4. **Stille?** Nach 7 Sekunden fragt er nach: *„<Vorname>, hörst du mich?“* Kommt wieder nichts, wird er still und wartet oben in der Menüleiste.
+1. **Einloggen.** Rechts oben unter der Menüleiste geht ein Fenster auf, und Helferlein fragt: *„Brauchst du heute Hilfe?“*
+2. **Reden oder tippen.** Mit **Enter** wird er still und du schreibst. Mit **„Sprechen“** redest du wieder.
+3. **Er erledigt es.** Brief in **Word**, Tabelle in **Excel**, Folien in **PowerPoint**, PDF in **PDF Acrobat**, Suche in **Brave**.
+4. **Stille?** Nach 7 Sekunden fragt er: *„\<Vorname\>, hörst du mich?“* Bleibt es still, wartet er oben in der Menüleiste.
 
 ## Einrichtung beim ersten Start
 
-Jeder richtet sich Helferlein selbst ein, das dauert eine Minute:
+| Schritt       | Auswahl |
+|---------------|---------|
+| **Vorname**   | So spricht er dich an. |
+| **Wofür**     | Briefe & Formulare, Arbeit, Schule & Studium, Verein, Privates & Hobby, Einkaufen & Rezepte, oder in eigenen Worten. |
+| **Programme** | Die ganze ArtCraft-Familie (siehe unten) und das Internet. Installierte Programme sind vorausgewählt. Was du abwählst, fasst er nicht an. |
+| **Stil**      | 😊 **Casual** · 🧘 **Ruhig & genau** · 😄 **Witzig** · 😈 **Ehrenlos** (frech, roastet liebevoll; Dokumente bleiben seriös). Jeden Stil kannst du mit 🔊 probehören. |
 
-| Schritt     | Auswahl |
-|-------------|---------|
-| **Vorname** | So spricht er dich an. |
-| **Wofür**   | Briefe & Formulare, Arbeit, Schule & Studium, Verein, Privates & Hobby, Einkaufen & Rezepte, oder in eigenen Worten. |
-| **Programme** | Word, PDF Acrobat, PowerPoint, Internet. Was du abwählst, fasst er nicht an. |
-| **Stil**    | 😊 **Casual**: locker wie ein guter Freund<br>🧘 **Ruhig & genau**: langsam, Schritt für Schritt<br>😄 **Witzig**: hilft mit Augenzwinkern<br>😈 **Ehrenlos**: frech, roastet dich liebevoll (Dokumente bleiben trotzdem seriös) |
+## Die Programme: ArtCraft-Familie
 
-Jeden Stil kann man vorher mit 🔊 probehören. Ändern lässt sich alles später über das **Zahnrad** im Fenster.
+Helferlein nennt die kostenlosen Open-Source-Apps von [ArtCraft](https://github.com/storytold) so, wie man sie kennt:
 
-> **Programmnamen:** Word ist [WordCraft](https://getartcraft.com/apps/wordcraft), PDF Acrobat ist [PdfCraft](https://github.com/storytold/pdfcraft/wiki), PowerPoint ist [DeckCraft](https://getartcraft.com/apps/deckcraft). Das sind kostenlose Open-Source-Apps von ArtCraft. Sie öffnen ganz normale .docx-, .pdf- und .pptx-Dateien. Fehlt eine davon, öffnet Helferlein die Datei in der Standard-App.
+| Helferlein sagt | App | Was er damit macht |
+|---|---|---|
+| **Word** | WordCraft | Briefe, Listen, Texte **erstellen**, Rechtschreibung **korrigieren**, öffnen |
+| **Excel** | GridCraft | Tabellen **erstellen** (Haushaltsbuch, Listen mit Summen), öffnen |
+| **PowerPoint** | DeckCraft | Präsentationen **erstellen**, öffnen |
+| **PDF Acrobat** | PdfCraft | PDFs **erstellen**, öffnen |
+| **Photoshop** | PhotoCraft | starten, Bilder öffnen |
+| **Lightroom** | LightCraft | starten, RAW-Fotos öffnen |
+| **Illustrator** | VectorCraft | starten, SVG/AI öffnen |
+| **InDesign** | DesignCraft | starten, Layouts öffnen |
+| **Premiere** | FilmCraft | starten, Videos öffnen |
+| **After Effects** | EffectCraft | starten |
+| **Pro Tools** | SoundCraft | starten, Audio öffnen |
+| **AutoCAD** | CADCraft | starten, DWG/DXF öffnen |
+| **Figma** | FigCraft | starten |
+| **Internet** | Brave Browser | suchen (Brave Search), Webseiten öffnen |
 
-## Installation
+Am einfachsten installierst du alles über den [ArtCraft Launcher](https://github.com/storytold/craft-launcher). Manche Apps (z. B. DeckCraft bei .pptx) nehmen Dateien nur über ihren eigenen „Öffnen“-Dialog an. Dann öffnet Helferlein die Datei darüber. Dafür braucht er einmalig die Erlaubnis **Bedienungshilfen** (Zahnrad › „Dateien automatisch öffnen“).
 
-**Voraussetzung:** Mac mit Apple Silicon (M1 oder neuer) und mindestens 16 GB RAM empfohlen, macOS 13 oder neuer.
+## Word auf Deutsch (WordCraft mit deutscher Rechtschreibprüfung)
 
-1. **Einmalig mit Admin-Account:**
-   - `xcode-select --install` ausführen (Command Line Tools).
-   - Word, PDF Acrobat und PowerPoint installieren, also WordCraft, PdfCraft und DeckCraft, am einfachsten über den [ArtCraft Launcher](https://github.com/storytold/craft-launcher).
-   - Optional [Brave](https://brave.com) installieren.
-2. **Im Account der Person, die Helferlein benutzen soll:**
-   ```bash
-   git clone https://github.com/KimJongUnNK/helferin.git ~/helferlein
-   ~/helferlein/scripts/install.sh
-   ```
-   Das Skript:
-   - installiert Ollama und lädt das Sprachmodell (ca. 4,7 GB),
-   - richtet das Dokument-Werkzeug ein,
-   - findet die Programme automatisch,
-   - prüft die Stimme,
-   - baut die App mit Logo,
-   - startet sie und richtet den Autostart ein.
-3. Beim ersten Start **Mikrofon** und **Spracherkennung** erlauben, dann einrichten.
-4. Prüfen: `~/helferlein/scripts/selftest.sh`
+WordCraft prüft von sich aus Englisch, Polnisch, Portugiesisch, Italienisch, Kroatisch, Türkisch, Russisch und Tschechisch, aber kein Deutsch. Deutscher Text ohne Sprachangabe wird deshalb als **US-Englisch** rot markiert. Das **Deutsch-Paket** behebt das:
 
-**Nur für diesen Account:** Helferlein landet in `~/Applications`, und der Autostart gilt nur für den Account, in dem `install.sh` lief. Andere Accounts auf demselben Mac bekommen nichts davon mit.
+- Es fügt Deutsch als echte Prüfsprache ein, mit Komposita („Haustürschlüssel“) und Vorschlägen („Gebutstag“ → „Geburtstag“).
+- Es lädt die deutschen Wörterbücher (Österreich, Deutschland, Schweiz; igerman98) nach `~/Library/Spelling`.
+- WordCraft startet danach auf Deutsch, und neue Dokumente sind Deutsch.
 
-**Schönste Stimme:** Systemeinstellungen → Bedienungshilfen → Gesprochene Inhalte → Systemstimme → Stimmen verwalten → Deutsch → **Anna (Premium)** laden. Helferlein nimmt automatisch die beste weibliche deutsche Stimme.
+**Installieren:** In Helferlein **Zahnrad › „Word auf Deutsch“ › Installieren**, oder im Terminal:
 
-**Komplett offline:** Systemeinstellungen → Tastatur → **Diktat** einschalten, Sprache Deutsch. Dann läuft auch die Spracherkennung auf dem Gerät.
-
-## Was er kann
-
-| Du sagst …                                   | Helferlein …                                                         |
-|----------------------------------------------|----------------------------------------------------------------------|
-| „Schreib einen Brief an die Gemeinde …“       | erstellt eine .docx in `Dokumente/Helferlein` und öffnet sie in Word |
-| „Mach mir die Einladung als PDF“              | erstellt ein .pdf und öffnet es in PDF Acrobat                       |
-| „Mach eine Präsentation über unseren Urlaub“  | erstellt eine .pptx (Titel + 4–8 Folien) und öffnet sie in PowerPoint |
-| „Öffne meinen Brief an die Gemeinde“          | sucht in Dokumente, Schreibtisch, Downloads und iCloud und öffnet ihn |
-| „Wie wird das Wetter morgen?“                 | öffnet eine Brave-Suche                                              |
-| „Mach orf.at auf“                             | öffnet die Seite in Brave                                            |
-| „Nein danke“                                  | verabschiedet sich, das Fenster geht zu                              |
-
-**Grenzen:** Er öffnet Webseiten nur, lesen kann er sie nicht. Er schickt keine E-Mails und kauft nichts. Bei Geld und Passwörtern warnt er vor Betrug.
-
-## Einstellungen für Bastler
-
-- `~/Library/Application Support/Helferlein/profile.json`: Name, Zweck, Programme, Stil. Wird bei der Einrichtung geschrieben.
-- `~/Library/Application Support/Helferlein/config.json`: Technik, siehe unten. Wirkt nach einem Neustart der App.
-
-```json
-{
-  "model": "qwen2.5:7b",
-  "wordApp": "WordCraft",
-  "pdfApp": "PDFCraft",
-  "deckApp": "DeckCraft",
-  "browserApp": "Brave Browser",
-  "speechRate": 0,
-  "voiceName": "",
-  "noSpeechSeconds": 7,
-  "maxReprompts": 1
-}
+```bash
+~/helferlein/extras/wordcraft-deutsch/install.sh            # installieren / nach WordCraft-Update erneut
+~/helferlein/extras/wordcraft-deutsch/install.sh --restore  # Original zurück
 ```
 
-- **`speechRate`:** `0` heißt, das Tempo kommt vom Stil. Sonst 0,4 (ruhig) bis 0,55 (flott).
-- **`voiceName`:** fester Stimmenname, z. B. `"Anna (Premium)"`.
-- **`noSpeechSeconds`:** Sekunden Stille bis zur Nachfrage.
-- **`maxReprompts`:** wie oft er nachfragt, 0 = nie.
+Das Skript nimmt die fertig gebaute Version aus den Releases. Ist keine erreichbar, baut es WordCraft selbst aus dem Quellcode (Rust wird dann nur für deinen Benutzer installiert). Den Patch selbst findest du unter [`extras/wordcraft-deutsch/wordcraft-deutsch.patch`](extras/wordcraft-deutsch/wordcraft-deutsch.patch).
+
+Zusätzlich kann Helferlein jedes Word-Dokument mit der deutschen Rechtschreibprüfung von macOS korrigieren. Sag einfach *„Korrigier meinen Brief“*. Er speichert dann eine korrigierte Kopie und zeigt dir jede Änderung.
+
+## Einstellungen (Zahnrad)
+
+- **Profil & Programme:** Name, Zweck, Programme und Stil ändern.
+- **Mikrofon:** Mikrofon wählen und mit Pegelanzeige testen.
+- **Stimme:** Hinweis, wie du **Anna (Premium)** lädst.
+- **Word auf Deutsch:** das Deutsch-Paket installieren oder nach einem WordCraft-Update erneut ausführen.
+- **Dateien automatisch öffnen:** die Erlaubnis Bedienungshilfen erteilen.
+- **Beim Anmelden starten:** Autostart an oder aus.
+- **Alles neu starten:** Wenn etwas hängt, beendet das die KI und Helferlein und startet beides frisch.
+
+## Installation für Entwickler (aus dem Quellcode)
+
+```bash
+git clone https://github.com/KimJongUnNK/helferin.git ~/helferlein
+~/helferlein/scripts/install.sh     # Ollama, Modell, Python-venv, App bauen, starten
+~/helferlein/scripts/selftest.sh    # Dokument-Werkzeug, Swift-Build, Modell-Aktionen, Stimme
+```
+
+`install.sh` braucht die Xcode Command Line Tools (`xcode-select --install`). Es installiert nur für den aktuellen Account.
+
+**Technik:** `~/Library/Application Support/Helferlein/config.json` (optional):
+
+```json
+{ "model": "qwen2.5:7b", "apps": { "powerpoint": "DeckCraft" }, "speechRate": 0,
+  "voiceName": "", "noSpeechSeconds": 7, "maxReprompts": 1 }
+```
 
 ## Aufbau
 
 ```
 Sources/Helferlein/
-  main.swift / AppDelegate.swift   Menüleiste, Fenster, Enter = leise
-  Profile.swift                    Profil, Programme (Word/PDF/PowerPoint/Internet), 4 Stile
-  OnboardingView.swift             Einrichtung beim ersten Start + Zahnrad
-  ChatView.swift / Orb.swift       Chat-Oberfläche, animierte Status-Kugel
-  Assistant.swift                  Gesprächsablauf, Nachfragen bei Stille, Aktionen
-  Speech.swift                     weibliche Stimme, Zuhören, Mikrofon-Pegel
-  Ollama.swift / Prompt.swift      lokales Modell mit erzwungener JSON-Antwort
-  Actions.swift                    Dateien bauen und öffnen, Brave
-helper/craftdocs.py                .docx/.pdf/.pptx erzeugen (mit Tests)
-Resources/Logo/                    Logo als SVG + PNG (wird zum App-Icon)
-scripts/                           install, build-app, selftest, uninstall
+  HelferleinApp.swift / AppDelegate.swift   Start, nur eine Instanz, Menüleiste, Enter = leise
+  Setup.swift / SetupView.swift             Vorbereitung: Ollama, Modell (mit Fortschritt), Programme
+  Profile.swift / OnboardingView.swift      Profil, ArtCraft-Programme, 4 Stile, Einrichtung
+  ChatView.swift / Orb.swift                Chat, Startkarten, animierte Status-Kugel
+  SettingsView.swift / LoginItem.swift      Einstellungen, Autostart, Neustart, Word auf Deutsch
+  Assistant.swift                           Gesprächsablauf, Nachfragen bei Stille, Aktionen
+  Speech.swift / AudioDevices.swift         Stimme, Zuhören, Mikrofon-Wahl und -Pegel
+  Ollama.swift / Prompt.swift               lokales Modell mit erzwungener JSON-Antwort
+  Actions.swift / Proofreader.swift         Dateien bauen/öffnen/finden, Brave, Rechtschreibkorrektur
+helper/craftdocs.py                         .docx / .pdf / .pptx / .xlsx erzeugen (mit Tests)
+extras/wordcraft-deutsch/                   Deutsch-Patch + Installer für WordCraft
+.github/workflows/build.yml                 baut DMG + WordCraft-Deutsch, Release bei Tag v*
 ```
 
 ## Deinstallieren
 
-```bash
-~/helferlein/scripts/uninstall.sh
-```
-
-Die Dokumente in `~/Documents/Helferlein` bleiben erhalten.
+Für die DMG-Version: die App in den Papierkorb legen. Bei der Entwickler-Installation: `~/helferlein/scripts/uninstall.sh`. Deine Dokumente in `~/Documents/Helferlein` bleiben erhalten.

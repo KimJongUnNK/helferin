@@ -12,6 +12,10 @@ on:
 permissions:
   contents: write
 
+defaults:
+  run:
+    shell: bash -eo pipefail {0}
+
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
@@ -36,6 +40,7 @@ jobs:
         run: |
           swift --version
           swift build -c release 2>&1 | tee build.log
+          grep 'warning:' build.log | grep 'Sources/' | sort -u | head -40 | sed 's/^/::warning::/' || true
           echo "### Swift-Build" >> "$GITHUB_STEP_SUMMARY"
           echo "Warnungen: $(grep -c 'warning:' build.log || true)" >> "$GITHUB_STEP_SUMMARY"
           grep 'warning:' build.log | sort -u | head -50 >> "$GITHUB_STEP_SUMMARY" || true
@@ -61,7 +66,8 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME}"
           [[ "$VERSION" == v* ]] || VERSION="0.0.0-dev"
-          HELFERLEIN_VERSION="$VERSION" EMBED_PYTHON="$PWD/embed/python" ./scripts/build-app.sh
+          set -o pipefail
+          HELFERLEIN_VERSION="$VERSION" EMBED_PYTHON="$PWD/embed/python" bash -x ./scripts/build-app.sh 2>&1 | tee app.log
 
       - name: Selbsttest der fertigen App
         run: |
@@ -82,6 +88,15 @@ jobs:
           cp packaging/Zuerst-lesen.txt "dmg/Zuerst lesen.txt"
           hdiutil create -volname "Helferlein" -srcfolder dmg -ov -format UDZO Helferlein.dmg
           ls -la Helferlein.dmg
+
+      - name: Fehler als Annotation melden
+        if: failure()
+        run: |
+          for f in build.log app.log; do
+            [ -f "$f" ] || continue
+            grep -E "error|Error|ERROR|fatal|No such|not found|denied|Traceback" "$f" | head -15 | sed "s/^/::error title=$f::/" || true
+            tail -n 8 "$f" | sed "s/^/::error title=$f (Ende)::/"
+          done
 
       - uses: actions/upload-artifact@v4
         with:
@@ -104,19 +119,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: WordCraft-Quellcode holen (neueste Version)
+      - name: WordCraft-Quellcode holen (der Stand, für den der Patch gemacht ist)
         run: |
-          TAG=$(gh api repos/storytold/wordcraft/releases/latest --jq .tag_name 2>/dev/null || true)
-          echo "WordCraft-Tag: ${TAG:-main}"
-          if [ -n "$TAG" ]; then
-            git clone -q --depth 1 --branch "$TAG" https://github.com/storytold/wordcraft wc
-          else
-            git clone -q --depth 1 https://github.com/storytold/wordcraft wc
-          fi
-          echo "WC_VERSION=${TAG:-main-$(git -C wc rev-parse --short HEAD)}" >> "$GITHUB_ENV"
+          BASE=$(cat extras/wordcraft-deutsch/BASE_COMMIT)
+          git init -q wc && cd wc
+          git remote add origin https://github.com/storytold/wordcraft
+          git fetch -q --depth 1 origin "$BASE" && git checkout -q FETCH_HEAD
+          VER=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          echo "WordCraft $VER ($BASE)"
+          echo "WC_VERSION=$VER-${BASE:0:7}" >> "$GITHUB_ENV"
 
       - name: Deutsch-Patch anwenden
-        run: cd wc && git apply --3way ../extras/wordcraft-deutsch/wordcraft-deutsch.patch && git status --short
+        run: |
+          cd wc
+          git apply --check -v ../extras/wordcraft-deutsch/wordcraft-deutsch.patch 2>&1 | tee ../patch.log
+          git apply ../extras/wordcraft-deutsch/wordcraft-deutsch.patch
+          git status --short
 
       - name: Rust aktualisieren
         run: rustup update stable && rustup default stable && rustc --version
@@ -131,7 +149,7 @@ jobs:
           restore-keys: wordcraft-
 
       - name: Tests der Rechtschreibprüfung (inkl. Deutsch)
-        run: cd wc && cargo test -q -p wordcraft-proof
+        run: cd wc && cargo test -q -p wordcraft-proof 2>&1 | tee ../test.log
 
       - name: Mit echtem österreichischem Wörterbuch prüfen
         run: |
@@ -142,7 +160,7 @@ jobs:
           cd wc && WORDCRAFT_DICTIONARIES="$PWD/../dicts" cargo test -q -p wordcraft-proof de::tests::real_dictionary_when_installed -- --nocapture
 
       - name: WordCraft bauen
-        run: cd wc && cargo build --release -p wordcraft
+        run: cd wc && cargo build --release -p wordcraft 2>&1 | tee ../cargo.log
 
       - name: Paket schnüren
         run: |
@@ -152,6 +170,15 @@ jobs:
           cp wc/LICENSE-MIT wc/LICENSE-APACHE pkg/
           (cd pkg && zip -q -r ../WordCraft-Deutsch-macos-arm64.zip .)
           ls -la WordCraft-Deutsch-macos-arm64.zip
+
+      - name: Fehler als Annotation melden
+        if: failure()
+        run: |
+          for f in patch.log test.log cargo.log; do
+            [ -f "$f" ] || continue
+            grep -E "error|Error|FAILED|panicked|does not apply|conflict" "$f" | head -15 | sed "s/^/::error title=$f::/" || true
+            tail -n 8 "$f" | sed "s/^/::error title=$f (Ende)::/"
+          done
 
       - uses: actions/upload-artifact@v4
         with:

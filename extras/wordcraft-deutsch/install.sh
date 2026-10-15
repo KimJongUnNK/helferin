@@ -15,7 +15,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="KimJongUnNK/helferin"
 PREBUILT_URL="https://github.com/$REPO/releases/latest/download/WordCraft-Deutsch-macos-arm64.zip"
-PATCH_URL="https://raw.githubusercontent.com/$REPO/main/extras/wordcraft-deutsch/wordcraft-deutsch.patch"
+RAW="https://raw.githubusercontent.com/$REPO/main/extras/wordcraft-deutsch"
 DICT_BASE="https://raw.githubusercontent.com/LibreOffice/dictionaries/master/de"
 SPELLING="$HOME/Library/Spelling"
 STATE="$HOME/Library/Application Support/Helferlein/wordcraft-deutsch"
@@ -108,11 +108,15 @@ if [ -z "$NEW_BIN" ]; then
   fi
   command -v git >/dev/null || die "git fehlt (xcode-select --install)."
   SRC="$WORK/wordcraft"
-  git clone -q --depth 1 --branch "v$VERSION" https://github.com/storytold/wordcraft "$SRC" 2>/dev/null \
-    || git clone -q --depth 1 https://github.com/storytold/wordcraft "$SRC"
   PATCH="$HERE/wordcraft-deutsch.patch"
-  [ -f "$PATCH" ] || { curl -fsSL -o "$WORK/de.patch" "$PATCH_URL"; PATCH="$WORK/de.patch"; }
-  (cd "$SRC" && git apply --3way "$PATCH") || die "Die Deutsch-Erweiterung passt nicht auf diese WordCraft-Version. Bitte Helferlein aktualisieren."
+  [ -f "$PATCH" ] || { curl -fsSL -o "$WORK/de.patch" "$RAW/wordcraft-deutsch.patch"; PATCH="$WORK/de.patch"; }
+  BASE="$(cat "$HERE/BASE_COMMIT" 2>/dev/null || curl -fsSL "$RAW/BASE_COMMIT")"
+  # Genau der WordCraft-Stand, für den die Deutsch-Erweiterung gemacht und getestet ist
+  git init -q "$SRC"
+  (cd "$SRC" && git remote add origin https://github.com/storytold/wordcraft \
+    && git fetch -q --depth 1 origin "$BASE" && git checkout -q FETCH_HEAD) \
+    || die "WordCraft-Quellcode konnte nicht geladen werden."
+  (cd "$SRC" && git apply "$PATCH") || die "Die Deutsch-Erweiterung passt nicht. Bitte Helferlein aktualisieren."
   (cd "$SRC" && cargo build --release -p wordcraft)
   NEW_BIN="$SRC/target/release/wordcraft"
   ok "gebaut"

@@ -149,7 +149,7 @@ final class SpeechIO: NSObject, AVSpeechSynthesizerDelegate {
     // Die folgenden Helfer sind nonisolated, damit ihre Closures auf Audio-/Erkennungs-Threads laufen dürfen.
 
     nonisolated private static func levelForwarder(_ owner: SpeechIO) -> @Sendable (Float) -> Void {
-        { [weak owner] v in Task { @MainActor in owner?.onLevel?(v) } }
+        { v in Task { @MainActor in owner.onLevel?(v) } }
     }
 
     nonisolated private static func tap(_ req: SFSpeechAudioBufferRecognitionRequest?,
@@ -167,12 +167,12 @@ final class SpeechIO: NSObject, AVSpeechSynthesizerDelegate {
 
     nonisolated private static func resultHandler(_ owner: SpeechIO, partial: @escaping @MainActor (String) -> Void)
         -> (SFSpeechRecognitionResult?, Error?) -> Void {
-        { [weak owner] result, error in
+        { result, error in
             let text = result?.bestTranscription.formattedString
             let isFinal = result?.isFinal ?? false
             let failed = error != nil
             Task { @MainActor in
-                guard let owner, !owner.finished else { return }
+                guard !owner.finished else { return }
                 if let text {
                     owner.lastText = text
                     partial(text)

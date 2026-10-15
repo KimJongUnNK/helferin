@@ -11,9 +11,10 @@ struct SettingsView: View {
     @State private var testing = false
     @State private var testLevel: Float = 0
     @State private var testError: String?
-    @State private var autostart = LoginItem.isEnabled
-    @State private var trusted = AXIsProcessTrusted()
-    @State private var wordcraftGerman = WordCraftGerman.isInstalled
+    @State private var autostart = false
+    @State private var trusted = false
+    @State private var wordcraftGerman = false
+    @State private var loaded = false
     @State private var confirmRestart = false
 
     var body: some View {
@@ -99,7 +100,7 @@ struct SettingsView: View {
                         Toggle("", isOn: $autostart)
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .onChange(of: autostart) { on in LoginItem.setEnabled(on) }
+                            .onChange(of: autostart) { on in if loaded { LoginItem.setEnabled(on) } }
                     }
 
                     // Neustart
@@ -132,6 +133,8 @@ struct SettingsView: View {
             devices = AudioDevices.inputDevices()
             trusted = AXIsProcessTrusted()
             wordcraftGerman = WordCraftGerman.isInstalled
+            autostart = LoginItem.isEnabled
+            loaded = true
         }
         .onDisappear { stopTest() }
         .alert("Alles neu starten?", isPresented: $confirmRestart) {
@@ -245,7 +248,7 @@ enum WordCraftGerman {
             NSWorkspace.shared.open(URL(string: "https://github.com/KimJongUnNK/helferin/tree/main/extras/wordcraft-deutsch")!)
             return
         }
-        for name in ["install.sh", "wordcraft-deutsch.patch"] {
+        for name in ["install.sh", "wordcraft-deutsch.patch", "BASE_COMMIT"] {
             let dest = target.appendingPathComponent(name)
             try? fm.removeItem(at: dest)
             try? fm.copyItem(at: source.appendingPathComponent(name), to: dest)

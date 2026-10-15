@@ -139,8 +139,8 @@ struct OllamaClient: Sendable {
     func hasModel() async -> Bool {
         var req = URLRequest(url: base.appendingPathComponent("api/tags"))
         req.timeoutInterval = 5
-        guard let (data, _) = try? await URLSession.shared.data(for: req),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard let response = try? await URLSession.shared.data(for: req),
+              let obj = try? JSONSerialization.jsonObject(with: response.0) as? [String: Any],
               let models = obj["models"] as? [[String: Any]] else { return false }
         let wanted = settings.model.contains(":") ? settings.model : settings.model + ":latest"
         return models.contains { ($0["name"] as? String) == wanted || ($0["model"] as? String) == wanted }
