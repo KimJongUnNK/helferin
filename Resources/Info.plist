@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>at.boenke.helferlein</string>
+    <key>CFBundleName</key>
+    <string>Helferlein</string>
+    <key>CFBundleDisplayName</key>
+    <string>Helferlein</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleExecutable</key>
+    <string>Helferlein</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Helferlein hört dir zu, wenn du mit ihm sprichst.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Helferlein wandelt deine Sprache in Text um – direkt auf diesem Mac.</string>
+</dict>
+</plist>

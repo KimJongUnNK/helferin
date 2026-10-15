@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFA443"/>
+      <stop offset="1" stop-color="#F2670A"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F5EFE4"/>
+    </linearGradient>
+    <clipPath id="tile"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>
+
+    <!-- Offene Hand, Finger nach oben, Handgelenk bei y=0 (nur Form, Farbe kommt von außen) -->
+    <g id="hand">
+      <rect x="-82" y="-40" width="164" height="600" rx="40"/>
+      <rect x="-112" y="-250" width="224" height="250" rx="78"/>
+      <rect x="-27" y="-205" width="54" height="205" rx="27" transform="translate(-80 -205) rotate(-17)"/>
+      <rect x="-27" y="-232" width="54" height="232" rx="27" transform="translate(-28 -222) rotate(-6)"/>
+      <rect x="-27" y="-222" width="54" height="222" rx="27" transform="translate(27 -220) rotate(5)"/>
+      <rect x="-25" y="-180" width="50" height="180" rx="25" transform="translate(80 -200) rotate(17)"/>
+      <rect x="-31" y="-175" width="62" height="175" rx="31" transform="translate(-92 -70) rotate(-52)"/>
+    </g>
+    <!-- Hand mit oranger Kontur, damit sich überlappende Hände sauber trennen -->
+    <g id="paperHand">
+      <use xlink:href="#hand" fill="#F47A1C" stroke="#F47A1C" stroke-width="30" stroke-linejoin="round"/>
+      <use xlink:href="#hand" fill="url(#paper)"/>
+    </g>
+  </defs>
+
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <ellipse cx="512" cy="180" rx="420" ry="190" fill="#FFFFFF" opacity="0.07"/>
+
+  <g clip-path="url(#tile)">
+    <!-- weiche Schatten -->
+    <g fill="#8A3300" opacity="0.16">
+      <use xlink:href="#hand" transform="translate(672 412) rotate(196) scale(0.86)"/>
+      <use xlink:href="#hand" transform="translate(394 650) rotate(16)"/>
+    </g>
+    <!-- Hand von oben: sucht Hilfe -->
+    <use xlink:href="#paperHand" transform="translate(660 395) rotate(196) scale(0.86)"/>
+    <!-- helfende Hand von unten -->
+    <use xlink:href="#paperHand" transform="translate(380 632) rotate(16)"/>
+  </g>
+</svg>
