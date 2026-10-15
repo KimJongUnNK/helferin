@@ -84,9 +84,8 @@ final class SetupManager: ObservableObject {
                 model = .working("Lade das Sprachmodell (ca. 4,7 GB) …")
                 modelProgress = 0
                 do {
-                    try await llm.pull { [weak self] fraction, status in
+                    try await llm.pull { fraction, status in
                         Task { @MainActor in
-                            guard let self else { return }
                             if fraction >= 0 { self.modelProgress = fraction }
                             if !status.isEmpty { self.model = .working(status) }
                         }
