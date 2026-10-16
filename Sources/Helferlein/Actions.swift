@@ -53,15 +53,11 @@ struct Actions: Sendable {
         ])
     }
 
-    /// Sprache der erstellten Dokumente: Deutsch mit der Region dieses Macs (de-AT, de-CH …), sonst de-DE.
-    static var documentLanguage: String {
-        let region = Locale.current.region?.identifier.uppercased() ?? ""
-        return ["AT", "CH", "LI", "LU", "BE"].contains(region) ? "de-\(region)" : "de-DE"
-    }
-
     private func runHelper(_ request: [String: Any]) throws -> URL {
         var payload = request
-        payload["lang"] = Self.documentLanguage
+        payload["lang"] = settings.resolvedDocumentLanguage
+        payload["font"] = settings.documentFont
+        payload["font_size"] = settings.documentFontSize
         let fm = FileManager.default
         guard fm.isExecutableFile(atPath: settings.pythonURL.path),
               fm.fileExists(atPath: settings.helperURL.path) else { throw Failure.helperMissing }
@@ -101,7 +97,10 @@ struct Actions: Sendable {
     // MARK: Programme
 
     func appURL(for tool: Tool) -> URL? {
-        AppLocator.find(settings.appNames(for: tool))
+        if let path = settings.appPaths[tool.rawValue], FileManager.default.fileExists(atPath: path) {
+            return URL(fileURLWithPath: path)
+        }
+        return AppLocator.find(settings.appNames(for: tool))
     }
 
     func installedTools() -> Set<Tool> {
@@ -244,9 +243,7 @@ struct Actions: Sendable {
     }
 
     func webSearch(_ query: String) {
-        var c = URLComponents(string: "https://search.brave.com/search")!
-        c.queryItems = [URLQueryItem(name: "q", value: query)]
-        openInBrowser(c.url!)
+        openInBrowser(settings.searchEngine.url(for: query))
     }
 
     private func openInBrowser(_ url: URL) {

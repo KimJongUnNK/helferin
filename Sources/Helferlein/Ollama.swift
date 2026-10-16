@@ -146,6 +146,44 @@ struct OllamaClient: Sendable {
         return models.contains { ($0["name"] as? String) == wanted || ($0["model"] as? String) == wanted }
     }
 
+    struct ModelInfo: Identifiable, Hashable, Sendable {
+        let name: String
+        let info: String
+        var id: String { name }
+    }
+
+    /// Installierte Modelle (Name, Größe in GB als Text).
+    func installedModels() async -> [ModelInfo] {
+        var req = URLRequest(url: base.appendingPathComponent("api/tags"))
+        req.timeoutInterval = 5
+        guard let response = try? await URLSession.shared.data(for: req),
+              let obj = try? JSONSerialization.jsonObject(with: response.0) as? [String: Any],
+              let models = obj["models"] as? [[String: Any]] else { return [] }
+        return models.compactMap { m in
+            guard let name = m["name"] as? String else { return nil }
+            let size = (m["size"] as? NSNumber)?.doubleValue ?? 0
+            return ModelInfo(name: name, info: String(format: "%.1f GB", size / 1_000_000_000))
+        }.sorted { $0.name < $1.name }
+    }
+
+    /// Ein Modell löschen (Speicher freigeben).
+    func deleteModel(_ name: String) async {
+        var req = URLRequest(url: base.appendingPathComponent("api/delete"))
+        req.httpMethod = "DELETE"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["model": name])
+        _ = try? await URLSession.shared.data(for: req)
+    }
+
+    /// Empfohlene Modelle für 16 GB RAM (Name, Beschreibung).
+    static let recommendedModels: [ModelInfo] = [
+        ModelInfo(name: "qwen2.5:7b", info: "Empfohlen · gutes Deutsch · 4,7 GB"),
+        ModelInfo(name: "qwen2.5:3b", info: "Schneller, etwas einfacher · 1,9 GB"),
+        ModelInfo(name: "llama3.1:8b", info: "Allrounder · 4,9 GB"),
+        ModelInfo(name: "gemma2:9b", info: "Sehr gutes Deutsch, langsamer · 5,4 GB"),
+        ModelInfo(name: "mistral:7b", info: "Schnell · 4,1 GB"),
+    ]
+
     /// Lädt das Modell und meldet den Fortschritt (0…1, Statustext).
     func pull(progress: @escaping @Sendable (Double, String) -> Void) async throws {
         var req = URLRequest(url: base.appendingPathComponent("api/pull"))
@@ -219,7 +257,7 @@ struct OllamaClient: Sendable {
             "stream": false,
             "format": AgentReply.schema(allowed: allowed, apps: apps.isEmpty ? [.word] : apps),
             "keep_alive": "30m",
-            "options": ["temperature": 0.4, "num_ctx": 8192],
+            "options": ["temperature": min(max(settings.temperature, 0), 1.2), "num_ctx": 8192],
         ]
         let data = try await post("api/chat", body, timeout: 300)
         guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],

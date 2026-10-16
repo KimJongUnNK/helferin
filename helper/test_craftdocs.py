@@ -55,6 +55,18 @@ class CraftDocsTest(unittest.TestCase):
         code, path, err = run({"kind": "docx", "title": "Kaputt", "lang": "<x>", "out_dir": self.tmp, "sections": []})
         self.assertEqual(code, 0, err)
 
+    def test_font_settings(self):
+        code, path, err = run({"kind": "docx", "title": "Schrift", "font": "Georgia", "font_size": 14,
+                               "out_dir": self.tmp, "sections": [{"heading": "", "text": "Hallo"}]})
+        self.assertEqual(code, 0, err)
+        normal = Document(path).styles["Normal"].font
+        self.assertEqual((normal.name, normal.size.pt), ("Georgia", 14))
+        code, path, err = run({"kind": "pdf", "title": "Schrift", "font": "Times New Roman", "font_size": 99,
+                               "out_dir": self.tmp, "sections": [{"heading": "", "text": "Hallo"}]})
+        self.assertEqual(code, 0, err)
+        with open(path, "rb") as f:
+            self.assertIn(b"Times-Roman", f.read())
+
     def test_letter_has_no_title_heading(self):
         code, path, err = run({
             "kind": "docx", "title": "Brief an Tante Gerti", "out_dir": self.tmp,

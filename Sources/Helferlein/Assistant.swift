@@ -25,15 +25,18 @@ final class Assistant: ObservableObject {
     @Published private(set) var focusRequest = 0
     @Published private(set) var profile: Profile?
     @Published private(set) var editingProfile = false
-    @Published var showingSettings = false
+    @Published private(set) var settings: Settings
 
     var onClose: (() -> Void)?
+    /// Öffnet das Einstellungsfenster (setzt die AppDelegate).
+    var onOpenSettings: (() -> Void)?
+    /// Einstellungen geändert (z. B. ⌘⌘ an/aus) – die AppDelegate reagiert darauf.
+    var onSettingsChanged: ((Settings) -> Void)?
     /// Einrichtung zeigen: beim allerersten Start oder über „Profil & Programme“.
     var needsOnboarding: Bool { profile == nil || editingProfile }
     /// Noch nichts gesagt oder getippt → Startkarten zeigen.
     var showsQuickStart: Bool { !messages.contains { $0.role == .user } }
 
-    let settings: Settings
     private let speech: SpeechIO
     private var history: [OllamaClient.Message] = []
     private var reprompts = 0
@@ -44,8 +47,6 @@ final class Assistant: ObservableObject {
         let settings = Settings.load()
         self.settings = settings
         speech = SpeechIO(voiceName: settings.voiceName)
-        speech.silenceSeconds = settings.silenceSeconds
-        speech.noSpeechSeconds = settings.noSpeechSeconds
         profile = Profile.load()
         applyStyle()
         speech.onLevel = { [weak self] v in self?.level = v }
@@ -71,7 +72,6 @@ final class Assistant: ObservableObject {
         let firstTime = profile == nil
         profile = p
         editingProfile = false
-        showingSettings = false
         applyStyle()
         if firstTime {
             LoginItem.setEnabled(true)
@@ -85,7 +85,6 @@ final class Assistant: ObservableObject {
         speech.stopAll()
         mode = .text
         if phase != .thinking { phase = .idle }
-        showingSettings = false
         editingProfile = true
     }
 
@@ -94,16 +93,64 @@ final class Assistant: ObservableObject {
         editingProfile = false
     }
 
+    /// Profil aus dem Einstellungsfenster speichern (ohne neue Begrüßung).
+    func updateProfile(_ change: (inout Profile) -> Void) {
+        guard var p = profile else { return }
+        change(&p)
+        guard p != profile else { return }
+        try? p.save()
+        profile = p
+        applyStyle()
+    }
+
+    /// Einstellungen ändern, speichern und sofort anwenden.
+    func updateSettings(_ change: (inout Settings) -> Void) {
+        var s = settings
+        change(&s)
+        guard s != settings else { return }
+        let voiceChanged = s.voiceName != settings.voiceName
+        settings = s
+        s.save()
+        if voiceChanged { speech.setVoice(named: s.voiceName) }
+        applyStyle()
+        onSettingsChanged?(s)
+    }
+
+    func resetSettings() {
+        updateSettings { $0 = Settings() }
+    }
+
+    func clearConversation() {
+        speech.stopAll()
+        messages = []
+        history = []
+        phase = .idle
+        mode = .text
+    }
+
     func openSettings() {
         speech.stopAll()
         mode = .text
         if phase != .thinking { phase = .idle }
-        showingSettings = true
+        onOpenSettings?()
     }
 
-    func closeSettings() {
-        speech.stopMicTest()
-        showingSettings = false
+    /// Kurz vorsprechen (Einstellungen › Stimme).
+    func previewVoice() {
+        guard let p = profile else { speech.speak("Hallo, ich bin Helferlein.") {}; return }
+        speech.speak(p.style.sample(name: p.firstName)) {}
+    }
+
+    /// ⌘⌘: alles stoppen und sofort zuhören (kurzes „Ja?“ als Bestätigung).
+    func activateVoice() {
+        guard !needsOnboarding else { return }
+        speech.stopAll()
+        liveTranscript = ""
+        mode = .voice
+        reprompts = 0
+        guard phase != .thinking else { return }
+        phase = .idle
+        say("Ja?")
     }
 
     /// „Probehören“ in der Einrichtung.
@@ -120,6 +167,10 @@ final class Assistant: ObservableObject {
 
     private func applyStyle() {
         speech.rate = settings.speechRate > 0 ? settings.speechRate : (profile?.style.rate ?? 0.48)
+        speech.pitch = settings.voicePitch
+        speech.volume = settings.voiceVolume
+        speech.silenceSeconds = settings.silenceSeconds
+        speech.noSpeechSeconds = settings.noSpeechSeconds
     }
 
     // MARK: Einstellungen: Mikrofon & Neustart
@@ -146,18 +197,21 @@ final class Assistant: ObservableObject {
 
     func greet() {
         guard let p = profile else { return }
-        let text = p.style.greeting(name: p.firstName, timeGreeting: Self.timeGreeting())
-            + " Wenn du lieber tippen willst, drück einfach Enter."
+        let hint = settings.startMode == .voice
+            ? " Wenn du lieber tippen willst, drück einfach Enter."
+            : " Schreib mir einfach, oder tipp auf „Sprechen“."
+        let text = p.style.greeting(name: p.firstName, timeGreeting: Self.timeGreeting()) + hint
         add(.assistant, text)
         history.append(.init(role: "assistant", content: text))
-        mode = .voice
+        mode = settings.startMode == .voice ? .voice : .text
+        if mode == .text { focusRequest += 1 }
         reprompts = 0
         say(text)
     }
 
     /// Klick aufs Menüleisten-Symbol: Fenster ist offen, Tippen ist bereit.
     func reopened() {
-        if needsOnboarding || showingSettings { return }
+        if needsOnboarding { return }
         if messages.isEmpty { greet(); return }
         mode = .text
         focusRequest += 1
@@ -226,7 +280,7 @@ final class Assistant: ObservableObject {
     }
 
     private func listen() {
-        guard mode == .voice, !needsOnboarding, !showingSettings else { return }
+        guard mode == .voice, !needsOnboarding else { return }
         phase = .listening
         liveTranscript = ""
         speech.listen(
@@ -292,10 +346,19 @@ final class Assistant: ObservableObject {
             action = .create_pdf
         }
 
-        func fileNote(_ url: URL, _ result: Actions.OpenResult, verb: String, symbol: String) -> ChatMessage {
+        let openFiles = settings.openCreatedFiles
+        func fileNote(_ url: URL, _ result: Actions.OpenResult?, verb: String, symbol: String) -> ChatMessage {
+            guard let result else {
+                return ChatMessage(role: .info, text: "„\(url.lastPathComponent)“ gespeichert.", symbol: symbol, fileURL: url)
+            }
             var text = "„\(url.lastPathComponent)“ \(verb) in \(result.label) geöffnet."
             if let hint = result.hint { text += "\n" + hint }
             return ChatMessage(role: .info, text: text, symbol: symbol, fileURL: url)
+        }
+        /// Erstellte Datei öffnen – außer es ist in den Einstellungen ausgeschaltet.
+        func openCreated(_ url: URL) async -> Actions.OpenResult? {
+            guard openFiles else { return nil }
+            return await Task.detached { actions.open(url) }.value
         }
 
         do {
@@ -308,14 +371,14 @@ final class Assistant: ObservableObject {
                     try pdf ? actions.createPDF(title: title, sections: sections)
                             : actions.createDocument(title: title, sections: sections)
                 }.value
-                let result = await Task.detached { actions.open(url) }.value
+                let result = await openCreated(url)
                 note = fileNote(url, result, verb: "gespeichert und", symbol: pdf ? Tool.pdf.symbol : Tool.word.symbol)
 
             case .create_presentation:
                 let title = reply.title?.nonEmpty ?? "Präsentation"
                 let slides = reply.slides ?? []
                 let url = try await Task.detached { try actions.createPresentation(title: title, slides: slides) }.value
-                let result = await Task.detached { actions.open(url) }.value
+                let result = await openCreated(url)
                 note = fileNote(url, result, verb: "gespeichert und", symbol: Tool.powerpoint.symbol)
 
             case .create_spreadsheet:
@@ -323,7 +386,7 @@ final class Assistant: ObservableObject {
                 let columns = reply.columns ?? []
                 let rows = reply.rows ?? []
                 let url = try await Task.detached { try actions.createSpreadsheet(title: title, columns: columns, rows: rows) }.value
-                let result = await Task.detached { actions.open(url) }.value
+                let result = await openCreated(url)
                 note = fileNote(url, result, verb: "gespeichert und", symbol: Tool.excel.symbol)
 
             case .proofread_file:

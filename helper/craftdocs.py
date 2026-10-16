@@ -77,6 +77,26 @@ def pptx_language(tag: str):
     return MSO_LANGUAGE_ID.GERMAN if tag.lower().startswith("de") else MSO_LANGUAGE_ID.NONE
 
 
+def font_settings(payload: dict):
+    """Schrift und Größe aus den Einstellungen (mit vernünftigen Grenzen)."""
+    name = str(payload.get("font") or "Calibri").strip()[:60] or "Calibri"
+    try:
+        size = float(payload.get("font_size") or 12)
+    except (TypeError, ValueError):
+        size = 12.0
+    return name, min(max(size, 8.0), 28.0)
+
+
+def pdf_base_font(name: str) -> str:
+    """reportlab kennt nur die PDF-Grundschriften: Serifen → Times, Schreibmaschine → Courier, sonst Helvetica."""
+    n = name.lower()
+    if any(k in n for k in ("times", "georgia", "garamond", "serif", "cambria", "baskerville")) and "sans" not in n:
+        return "Times-Roman"
+    if any(k in n for k in ("courier", "mono", "consolas", "menlo")):
+        return "Courier"
+    return "Helvetica"
+
+
 def safe_filename(title: str) -> str:
     name = re.sub(r'[\\/:*?"<>|\n\r\t]+', " ", title or "").strip()
     name = re.sub(r"\s+", " ", name)[:80].strip(" .")
@@ -115,9 +135,10 @@ def add_text_block(doc, text: str) -> None:
 def build_docx(payload: dict) -> str:
     title = (payload.get("title") or "Dokument").strip()
     doc = Document()
+    font_name, font_size = font_settings(payload)
     normal = doc.styles["Normal"]
-    normal.font.name = "Calibri"
-    normal.font.size = Pt(12)
+    normal.font.name = font_name
+    normal.font.size = Pt(font_size)
     set_docx_language(doc, lang_tag(payload))
 
     sections = payload.get("sections") or []
@@ -155,8 +176,11 @@ def build_pdf(payload: dict) -> str:
     is_letter = sections and all(not (s.get("heading") or "").strip() for s in sections)
 
     styles = getSampleStyleSheet()
+    font_name, font_size = font_settings(payload)
+    base = pdf_base_font(font_name)
     body = styles["BodyText"]
-    body.fontSize, body.leading, body.spaceAfter = 11.5, 16, 8
+    body.fontName = base
+    body.fontSize, body.leading, body.spaceAfter = font_size, font_size * 1.4, 8
     esc = lambda t: html.escape(t, quote=False)
 
     story = []
@@ -186,6 +210,7 @@ def build_pptx(payload: dict) -> str:
     prs.slide_width, prs.slide_height = Inches(13.333), Inches(7.5)  # 16:9
 
     language = pptx_language(lang_tag(payload))
+    font_name, _ = font_settings(payload)
     cover = prs.slides.add_slide(prs.slide_layouts[0])
     cover.shapes.title.text = title
     cover.placeholders[1].text = datetime.date.today().strftime("%d.%m.%Y")
@@ -210,6 +235,7 @@ def build_pptx(payload: dict) -> str:
                     for para in shape.text_frame.paragraphs:
                         for run in para.runs:
                             run.font.language_id = language
+                            run.font.name = font_name
 
     path = unique_path(payload["out_dir"], safe_filename(title), "pptx")
     prs.save(path)

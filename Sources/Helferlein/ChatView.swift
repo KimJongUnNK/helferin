@@ -11,14 +11,11 @@ struct RootView: View {
                 SetupView(setup: setup)
             } else if assistant.needsOnboarding {
                 OnboardingView(assistant: assistant)
-            } else if assistant.showingSettings {
-                SettingsView(assistant: assistant)
             } else {
                 ChatView(assistant: assistant)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: assistant.needsOnboarding)
-        .animation(.easeInOut(duration: 0.2), value: assistant.showingSettings)
     }
 }
 
@@ -80,7 +77,7 @@ struct ChatView: View {
                     .background(Color.secondary.opacity(0.12), in: Circle())
             }
             .buttonStyle(.plain)
-            .help("Einstellungen: Profil, Mikrofon, Neustart …")
+            .help("Einstellungen: Profil, Programme, Stimme, Mikrofon, KI, Neustart …")
             Button {
                 assistant.mode == .voice ? assistant.switchToText() : assistant.switchToVoice()
             } label: {
@@ -115,7 +112,7 @@ struct ChatView: View {
                         .font(.system(size: 16))
                         .foregroundStyle(assistant.liveTranscript.isEmpty ? Color.secondary : Color.primary)
                         .lineLimit(3)
-                    Text("Enter drücken = leise stellen und tippen")
+                    Text("Enter = leise stellen und tippen · ⌘⌘ = zuhören")
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                 }

@@ -75,7 +75,7 @@ enum Prompt {
         DEIN STIL: \(p.style.instruction)
 
         Antworte IMMER als JSON nach dem vorgegebenen Schema.
-        "reply" wird oft laut vorgelesen: höchstens 2–3 kurze Sätze, kein Markdown, keine Emojis, keine Aufzählungen.
+        "reply" wird oft laut vorgelesen: \(s.answerLength.instruction), kein Markdown, keine Emojis, keine Aufzählungen.
         Nenne Programme nur so: Word, Excel, PowerPoint, PDF Acrobat, Photoshop, Lightroom, Illustrator, InDesign, Premiere, After Effects, Pro Tools, AutoCAD, Figma, Brave.
 
         Deine Fähigkeiten ("action"):

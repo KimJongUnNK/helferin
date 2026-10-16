@@ -7,6 +7,8 @@ HELFERLEIN – so geht's los
    macOS sagt beim ersten Mal, dass die App „nicht überprüft“ werden kann
    (sie ist kostenlos und nicht bei Apple registriert). Dann:
    Systemeinstellungen › Datenschutz & Sicherheit › ganz unten „Dennoch öffnen“.
+   Sagt macOS „beschädigt“: Terminal öffnen und eingeben
+      xattr -cr /Applications/Helferlein.app
 
 3. Helferlein bereitet sich einmalig vor (lädt die KI, ca. 5 GB) und fragt dann
    nach deinem Namen, deinen Programmen und wie er mit dir reden soll.
@@ -16,8 +18,12 @@ HELFERLEIN – so geht's los
 Tipps
 -----
 • Rechts oben in der Menüleiste ist Helferlein immer erreichbar.
+• ⌘ zweimal kurz drücken (in jedem Programm) = Helferlein springt auf und hört zu.
+  Dafür einmal „Bedienungshilfen“ erlauben (Helferlein fragt beim ersten Start).
 • Enter = leise stellen und tippen. „Sprechen“ = wieder reden.
-• Zahnrad = Einstellungen: Mikrofon wählen, alles neu starten, Word auf Deutsch.
+• Zahnrad (oder Rechtsklick aufs Menüleisten-Symbol) = Einstellungen:
+  Profil & Stil, Programme, Stimme, Mikrofon, KI-Modell, Dokumente, Rechte,
+  „Alles neu starten“, Word auf Deutsch.
 • Schönere Stimme: Systemeinstellungen › Bedienungshilfen › Gesprochene Inhalte ›
   Systemstimme › Stimmen verwalten › Deutsch › „Anna (Premium)“.
 

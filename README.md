@@ -17,7 +17,7 @@
 ## So fühlt es sich an
 
 1. **Einloggen.** Rechts oben unter der Menüleiste geht ein Fenster auf, und Helferlein fragt: *„Brauchst du heute Hilfe?“*
-2. **Reden oder tippen.** Mit **Enter** wird er still und du schreibst. Mit **„Sprechen“** redest du wieder.
+2. **Reden oder tippen.** Mit **Enter** wird er still und du schreibst. Mit **„Sprechen“** oder **⌘⌘** redest du wieder.
 3. **Er erledigt es.** Brief in **Word**, Tabelle in **Excel**, Folien in **PowerPoint**, PDF in **PDF Acrobat**, Suche in **Brave**.
 4. **Stille?** Nach 7 Sekunden fragt er: *„\<Vorname\>, hörst du mich?“* Bleibt es still, wartet er oben in der Menüleiste.
 
@@ -72,15 +72,24 @@ Das Skript nimmt die fertig gebaute Version aus den Releases. Ist keine erreichb
 
 Zusätzlich kann Helferlein jedes Word-Dokument mit der deutschen Rechtschreibprüfung von macOS korrigieren. Sag einfach *„Korrigier meinen Brief“*. Er speichert dann eine korrigierte Kopie und zeigt dir jede Änderung.
 
-## Einstellungen (Zahnrad)
+## ⌘ zweimal drücken
 
-- **Profil & Programme:** Name, Zweck, Programme und Stil ändern.
-- **Mikrofon:** Mikrofon wählen und mit Pegelanzeige testen.
-- **Stimme:** Hinweis, wie du **Anna (Premium)** lädst.
-- **Word auf Deutsch:** das Deutsch-Paket installieren oder nach einem WordCraft-Update erneut ausführen.
-- **Dateien automatisch öffnen:** die Erlaubnis Bedienungshilfen erteilen.
-- **Beim Anmelden starten:** Autostart an oder aus.
-- **Alles neu starten:** Wenn etwas hängt, beendet das die KI und Helferlein und startet beides frisch.
+In **jedem Programm**: zweimal kurz die Befehlstaste **⌘** drücken. Helferlein springt auf, sagt „Ja?“ und hört zu. Beim ersten Start fragt macOS einmal nach der Erlaubnis **Bedienungshilfen**, die braucht das. Ohne sie geht ⌘⌘ nur, wenn Helferlein vorne ist. Ein- und ausschalten kannst du das unter Einstellungen › Zuhören & Mikrofon.
+
+## Einstellungen
+
+Das Zahnrad im Fenster (oder ein Rechtsklick aufs Menüleisten-Symbol) öffnet das Einstellungsfenster:
+
+| Bereich | Was du einstellen kannst |
+|---|---|
+| **Profil & Stil** | Vorname, wofür du Helferlein brauchst, Sprechstil (Casual, Ruhig & genau, Witzig, Ehrenlos) mit Probehören, Einrichtung neu durchgehen |
+| **Programme** | Jedes ArtCraft-Programm ein/aus, gefundene App mit Pfad, eigene App wählen, „Testen“; Suchmaschine (Brave, DuckDuckGo, Startpage, Ecosia, Google) und Browser; **Word auf Deutsch** installieren/wiederherstellen |
+| **Stimme** | Stimme wählen (alle deutschen Stimmen mit Qualität), Probehören, Tempo (vom Stil oder eigenes), Tonhöhe, Lautstärke |
+| **Zuhören & Mikrofon** | Mikrofon wählen und mit Pegel testen, ⌘⌘ an/aus, Pause bis Satzende, Sekunden bis zur Nachfrage, wie oft nachfragen, beim Login begrüßen, mit Sprechen oder Tippen starten |
+| **KI-Modell** | Aktives Modell, weitere Modelle mit Fortschritt laden (qwen2.5 7b/3b, llama3.1, gemma2, mistral), Kreativität, Antwortlänge, Modelle löschen, Ollama-Adresse |
+| **Dokumente** | Speicherort, Sprache der Dokumente (Österreich/Deutschland/Schweiz/automatisch), Schriftart und -größe, erstellte Dateien gleich öffnen |
+| **System & Rechte** | Autostart, Status und Knöpfe für Mikrofon, Spracherkennung und Bedienungshilfen, Offline-Diktat |
+| **Wartung & Hilfe** | **Alles neu starten**, Gespräch löschen, Einstellungen zurücksetzen, Einstellungs-Ordner, Version, nach Updates suchen, deinstallieren |
 
 ## Installation für Entwickler (aus dem Quellcode)
 

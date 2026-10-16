@@ -19,11 +19,32 @@ final class SpeechIO: NSObject, AVSpeechSynthesizerDelegate {
     private var finalHandler: (@MainActor (String) -> Void)?
 
     var rate: Float = 0.48
+    var pitch: Float = 1.05
+    var volume: Float = 1.0
     var silenceSeconds: Double = 1.6
     var noSpeechSeconds: Double = 7
     /// Mikrofon-Pegel 0…1, für die Animation.
     var onLevel: (@MainActor (Float) -> Void)?
     private(set) var voice: AVSpeechSynthesisVoice?
+
+    func setVoice(named name: String) {
+        voice = Self.pickVoice(named: name)
+    }
+
+    /// Alle deutschen Stimmen, beste zuerst (für die Auswahl in den Einstellungen).
+    static var germanVoices: [AVSpeechSynthesisVoice] {
+        AVSpeechSynthesisVoice.speechVoices()
+            .filter { $0.language.hasPrefix("de") }
+            .sorted { ($0.quality.rawValue, $0.gender == .female ? 1 : 0, $0.name) > ($1.quality.rawValue, $1.gender == .female ? 1 : 0, $1.name) }
+    }
+
+    static func qualityLabel(_ v: AVSpeechSynthesisVoice) -> String {
+        switch v.quality {
+        case .premium: return "Premium"
+        case .enhanced: return "Erweitert"
+        default: return "Standard"
+        }
+    }
 
     init(voiceName: String = "") {
         super.init()
@@ -67,7 +88,8 @@ final class SpeechIO: NSObject, AVSpeechSynthesizerDelegate {
         let u = AVSpeechUtterance(string: text)
         u.voice = voice
         u.rate = rate
-        u.pitchMultiplier = 1.05
+        u.pitchMultiplier = pitch
+        u.volume = volume
         u.postUtteranceDelay = 0.15
         synth.speak(u)
     }
